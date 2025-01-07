@@ -1,0 +1,129 @@
+---
+title: "Cardiovascular disease prediction"
+output: pdf_document
+date: "2025-01-06"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+### used libraries
+```{r}
+library(corrplot)
+library(reshape2)
+library(ggplot2)
+```
+
+```{r cars}
+cardio = read.csv2("data/cardio_train.csv")
+summary(cardio)
+```
+We are interested in determining if different variable in the dataset have an impact on the probability of developing a cardiovascular disease and ultimately predict its insurgence.
+We are dealing with very different units of measurement: it will probably be necessary to scale them or do some preprocessing before utilizing them.
+```{r}
+# in order to plot correlation
+cardio = lapply(cardio, function(x) if(is.integer(x)) as.numeric(x) else x)
+```
+
+## Exploratory data analysis
+```{r}
+table(cardio$cardio)
+```
+The dataset is balanced with respect to the target variable.
+```{r}
+corrplot(cor(as.matrix(cardio), method='pearson'))
+```
+
+```{r pressure, echo=FALSE}
+corrplot(cor(cardio))
+numerical = cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
+categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
+
+pairs(cardio[c("age", "height", "weight", "ap_hi", "ap_lo")])
+```
+```{r}
+pairs(numerical,
+      labels = colnames(numerical),  
+      pch = 21,
+      bg = rainbow(2)[as.factor(cardio$cardio)],
+      col = rainbow(2)[as.factor(cardio$cardio)], 
+      main = "Cardiovascular disease dataset",
+      row1attop = TRUE,         # If FALSE, changes the direction of the diagonal
+      gap = 1,                  # Distance between subplots
+      cex.labels = NULL,        # Size of the diagonal text
+      font.labels = 1)
+```
+```{r}
+panel.hist <- function(x, ...) {
+    usr <- par("usr")
+    on.exit(par(usr))
+    par(usr = c(usr[1:2], 0, 1.5))
+    his <- hist(x, plot = FALSE)
+    breaks <- his$breaks
+    nB <- length(breaks)
+    y <- his$counts
+    y <- y/max(y)
+    rect(breaks[-nB], 0, breaks[-1], y, col = rgb(0, 1, 1, alpha = 0.5), ...)
+    # lines(density(x), col = 2, lwd = 2) # Uncomment to add density lines
+}
+
+# Creating the scatter plot matrix
+pairs(numerical,
+      upper.panel = NULL,         # Disabling the upper panel
+      diag.panel = panel.hist)    # Adding the histograms
+```
+
+
+```{r}
+cardio$age = ceiling(cardio$age/365)
+cardio$age_cat <- NA
+
+# Loop through each element in cardio$age
+for (i in seq_along(cardio$age)) {
+  if (cardio$age[i] >= 18 & cardio$age[i] <= 35) {
+    cardio$age_cat[i] <- 'Y' # young
+  } else if (cardio$age[i] > 35 & cardio$age[i] <= 55) {
+    cardio$age_cat[i] <- 'S' # senior
+  } else {
+    cardio$age_cat[i] <- 'E' #elderly
+  }
+}
+    
+```
+Correlation analysis
+```{r}
+cor_cardio = round(cor(as.data.frame(numerical)), 2)
+melt_cardio = melt(cor_cardio)
+
+ggplot(data = melt_cardio, aes(x=Var1, y=Var2, fill=value)) + 
+  geom_tile() +
+  geom_text(aes(Var2, Var1, label = value), size = 5) +
+  scale_fill_gradient2(low = "blue", high = "red",
+                       limit = c(-1,1), name="Correlation") +
+  theme(axis.title.x = element_blank(),
+        axis.title.y = element_blank(),
+        panel.background = element_blank())
+```
+
+```{r}
+summary_table = as.data.frame(table(cardio$age_cat, cardio$cardio))
+colnames(summary_table) <- c("age_cat", "cardio", "count")
+
+ggplot(summary_table, aes(x = age_cat, y = count, fill = as.factor(cardio))) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(
+    title = "Counts of cardio by Age Category",
+    x = "Age Category",
+    y = "Count",
+    fill = "Cardio"
+  ) +
+  theme_minimal()
+
+```
+
