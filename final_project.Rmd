@@ -1,53 +1,92 @@
 ---
-title: "Cardiovascular disease prediction"
-output: pdf_document
-date: "2025-01-06"
+title: "Project"
+author: Giovanni Billo, Muhammad Mubashar Shahzad, Carlos Velásquez Fernández, Fabio Vicig
+date: "2025-01-07"
+output: html_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-### used libraries
+Firstly, an exploratory analysis has been conducted, with the purpose of identifying problems and have at a glance an idea of meaning and distribution of the variables.
+
+```{r 'Explorative analysis and data cleaning'}
+cardio_with_id <- read.csv("cardio_train.csv", sep= ";", header=TRUE)
+cardio <- cardio_with_id[,-1]
+sum(as.numeric(is.na(cardio)))
+str(cardio)
+summary(cardio)
+par(mfrow = c(2,2))
+```
+
+The dataset contains 70000 observations of 12 variables. The source doesn't specify how the data was recovered or generated, and it has not been possible to find it elsewhere than Kaggle. The variables are the following:\
+- **cardio** : objective variable of our analysis. \
+- **age** : age of the patient, in days\
+- **gender** : categorical variable which is 1 for females and 2 for males\
+- **height** : height of the patient, in cm\
+- **weight** : weight of the patient, in kg\
+- **ap_hi** : systolic blood pressure\
+- **ap_lo** : diastolic blood pressure\
+- **cholesterol** : categorical variable with three levels of cholesterol: 1: normal, 2: above normal, 3: well above normal\
+- **gluc** : categorical variable with three levels of glucose: 1: normal, 2: above normal, 3: well above normal\
+- **smoke** : binary variable, representing smokers\
+- **alco** : binary variable, representing alcohol intake\
+- **active** : binary variable, representing physical activity\
+The last three variables are marked as "subjective", which probably means they are judged with different metrics.\
+\
+There are no NA values. However, from the summary we can see that there are variables with impossible values: specifically, *ap_hi* and *ap_lo* have in some cases negative values, which don't make sense even for a dead person, and in other cases extremely high values.
+"The highest pressure recorded in an individual was 370/360"
+{DOI: 10.1016/s0003-9993(95)80578-8}
+
+```{r}
+summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
+cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo),]
+```
+
+1274 observations have completely irrealistic values for either systolic or diastolic pressure (or both). It is less than 2% of our dataset, so the most straightforward approach is just to eliminate the problematic rows. Of this 1274, 274 were eliminated because in them systolic pressure was less than the diastolic.\
+
+```{r}
+cardio[c("gender", "cholesterol", "gluc", "smoke", "alco","active")] <- lapply(cardio[c("gender", "cholesterol", "gluc", "smoke", "alco","active")], factor)
+cardio$gender <- factor(cardio$gender, levels = c("F", "M"))
+cardio$cholesterol <- factor(cardio$cholesterol, levels = c("normal", "above normal", "well above normal"))
+cardio$gluc <- factor(cardio$gluc, levels = c("normal", "above normal", "well above normal"))
+```
+
+```{r age_categorizing}
+cardio$age = ceiling(cardio$age/365)
+cardio$age_cat <- ifelse(cardio$age >= 18 & cardio$age <= 35, 'Y', 
+                         ifelse(cardio$age > 35 & cardio$age <= 55, 'S', 'E'))
+    
+```
+
 ```{r}
 library(corrplot)
 library(reshape2)
 library(ggplot2)
 ```
 
-```{r cars}
-cardio = read.csv2("data/cardio_train.csv")
-summary(cardio)
-```
-We are interested in determining if different variable in the dataset have an impact on the probability of developing a cardiovascular disease and ultimately predict its insurgence.
-We are dealing with very different units of measurement: it will probably be necessary to scale them or do some preprocessing before utilizing them.
-```{r}
-# in order to plot correlation
-cardio = lapply(cardio, function(x) if(is.integer(x)) as.numeric(x) else x)
-```
 
-## Exploratory data analysis
 ```{r}
+numerical <- cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
+categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
 table(cardio$cardio)
 ```
 The dataset is balanced with respect to the target variable.
-```{r}
+```{r eval=FALSE, include=FALSE}
 corrplot(cor(as.matrix(cardio), method='pearson'))
 ```
 
-```{r pressure, echo=FALSE}
-corrplot(cor(cardio))
-numerical = cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
-categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
+```{r pressure, eval=FALSE, include=FALSE}
+#corrplot(cor(cardio))
+
 
 pairs(cardio[c("age", "height", "weight", "ap_hi", "ap_lo")])
 ```
-```{r}
+```{r eval=FALSE, include=FALSE}
 pairs(numerical,
       labels = colnames(numerical),  
       pch = 21,
@@ -59,7 +98,8 @@ pairs(numerical,
       cex.labels = NULL,        # Size of the diagonal text
       font.labels = 1)
 ```
-```{r}
+
+```{r eval=FALSE}
 panel.hist <- function(x, ...) {
     usr <- par("usr")
     on.exit(par(usr))
@@ -80,23 +120,10 @@ pairs(numerical,
 ```
 
 
-```{r}
-cardio$age = ceiling(cardio$age/365)
-cardio$age_cat <- NA
 
-# Loop through each element in cardio$age
-for (i in seq_along(cardio$age)) {
-  if (cardio$age[i] >= 18 & cardio$age[i] <= 35) {
-    cardio$age_cat[i] <- 'Y' # young
-  } else if (cardio$age[i] > 35 & cardio$age[i] <= 55) {
-    cardio$age_cat[i] <- 'S' # senior
-  } else {
-    cardio$age_cat[i] <- 'E' #elderly
-  }
-}
-    
-```
+
 Correlation analysis
+
 ```{r}
 cor_cardio = round(cor(as.data.frame(numerical)), 2)
 melt_cardio = melt(cor_cardio)
@@ -126,4 +153,3 @@ ggplot(summary_table, aes(x = age_cat, y = count, fill = as.factor(cardio))) +
   theme_minimal()
 
 ```
-
