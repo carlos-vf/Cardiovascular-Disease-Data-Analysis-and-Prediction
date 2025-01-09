@@ -1,8 +1,33 @@
 ---
-title: "Project"
-author: Giovanni Billo, Muhammad Mubashar Shahzad, Carlos Velásquez Fernández, Fabio Vicig
+title: "Cardiovascular Disease Data Analysis"
+author: Giovanni Billo, Muhammad Mubashar Shahzad, Carlos Velázquez Fernández, Fabio Vicig
 date: "2025-01-07"
-output: html_document
+output: 
+  html_document:
+    toc: true
+    toc_depth: '3'
+    df_print: paged
+  pdf_document:
+    toc: true
+    toc_depth: 3
+editor_options: 
+  markdown: 
+    wrap: 72
+references:
+  - id: narloch1995influence
+    title: "Influence of breathing technique on arterial blood pressure during heavy weight lifting"
+    author:
+      - family: "Narloch"
+        given: "Joseph A"
+      - family: "Brandstater"
+        given: "Murray E"
+    container-title: "Archives of physical medicine and rehabilitation"
+    volume: 76
+    issue: 5
+    page: "457-462"
+    issued:
+      year: 1995
+    publisher: "Elsevier"
 ---
 
 ```{r setup, include=FALSE}
@@ -10,12 +35,17 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
+## Introduction
+
 The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
+
+
+## Data exploration
 
 Firstly, an exploratory analysis has been conducted, with the purpose of identifying problems and have at a glance an idea of meaning and distribution of the variables.
 
 ```{r 'Explorative analysis and data cleaning'}
-cardio_with_id <- read.csv("cardio_train.csv", sep= ";", header=TRUE)
+cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
 cardio <- cardio_with_id[,-1]
 sum(as.numeric(is.na(cardio)))
 str(cardio)
@@ -24,30 +54,31 @@ par(mfrow = c(2,2))
 ```
 
 The dataset contains 70000 observations of 12 variables. The source doesn't specify how the data was recovered or generated, and it has not been possible to find it elsewhere than Kaggle. The variables are the following:\
+
 - **cardio** : objective variable of our analysis. \
-- **age** : age of the patient, in days\
-- **gender** : categorical variable which is 1 for females and 2 for males\
-- **height** : height of the patient, in cm\
-- **weight** : weight of the patient, in kg\
-- **ap_hi** : systolic blood pressure\
-- **ap_lo** : diastolic blood pressure\
-- **cholesterol** : categorical variable with three levels of cholesterol: 1: normal, 2: above normal, 3: well above normal\
-- **gluc** : categorical variable with three levels of glucose: 1: normal, 2: above normal, 3: well above normal\
-- **smoke** : binary variable, representing smokers\
-- **alco** : binary variable, representing alcohol intake\
-- **active** : binary variable, representing physical activity\
+- **age** : age of the patient, in days.\
+- **gender** : categorical variable which is 1 for females and 2 for males.\
+- **height** : height of the patient, in cm.\
+- **weight** : weight of the patient, in kg.\
+- **ap_hi** : systolic blood pressure.\
+- **ap_lo** : diastolic blood pressure.\
+- **cholesterol** : categorical variable with three levels of cholesterol: 1: normal, 2: above normal, 3: well above normal.\
+- **gluc** : categorical variable with three levels of glucose: 1: normal, 2: above normal, 3: well above normal.\
+- **smoke** : binary variable, representing smokers.\
+- **alco** : binary variable, representing alcohol intake.\
+- **active** : binary variable, representing physical activity.
+
 The last three variables are marked as "subjective", which probably means they are judged with different metrics.\
 \
 There are no NA values. However, from the summary we can see that there are variables with impossible values: specifically, *ap_hi* and *ap_lo* have in some cases negative values, which don't make sense even for a dead person, and in other cases extremely high values.
-"The highest pressure recorded in an individual was 370/360"
-{DOI: 10.1016/s0003-9993(95)80578-8}
+The highest pressure recorded in an individual was 370/360 [@narloch1995influence].
 
 ```{r}
 summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
 cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo),]
 ```
 
-1274 observations have completely irrealistic values for either systolic or diastolic pressure (or both). It is less than 2% of our dataset, so the most straightforward approach is just to eliminate the problematic rows. Of this 1274, 274 were eliminated because in them systolic pressure was less than the diastolic.\
+1274 observations have completely unrealistic values for either systolic or diastolic pressure (or both). In 274 of them, the systolic pressure is less than the diastolic, which is also not possible. These wrong metrics are less than 2% of our dataset, so the most straightforward approach is just to eliminate the problematic rows. \
 
 ```{r}
 cardio[c("gender", "cholesterol", "gluc", "smoke", "alco","active")] <- lapply(cardio[c("gender", "cholesterol", "gluc", "smoke", "alco","active")], factor)
@@ -145,11 +176,12 @@ colnames(summary_table) <- c("age_cat", "cardio", "count")
 ggplot(summary_table, aes(x = age_cat, y = count, fill = as.factor(cardio))) +
   geom_bar(stat = "identity", position = "dodge") +
   labs(
-    title = "Counts of cardio by Age Category",
+    title = "Counts of Cardio Diseases by Age Category",
     x = "Age Category",
     y = "Count",
     fill = "Cardio"
   ) +
   theme_minimal()
-
 ```
+
+## References
