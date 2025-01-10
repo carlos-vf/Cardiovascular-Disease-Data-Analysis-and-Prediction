@@ -33,12 +33,21 @@ references:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-
+```{r}
+library(corrplot)
+library(reshape2)
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+library(gridExtra)
+library(dendextend)
+# Assess clusters
+library(cluster)
+```
 
 ## Introduction
 
 The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
-
 
 ## Data exploration
 
@@ -68,7 +77,7 @@ The dataset contains 70000 observations of 12 variables. The source doesn't spec
 - **alco** : binary variable, representing alcohol intake.\
 - **active** : binary variable, representing physical activity.
 
-The last three variables are marked as "subjective", which probably means they are judged with different metrics.\
+The last three variables are marked as "subjective", meaning that this info is supplied by patients themselves (probably through surveying) and therefore, being based on the patient's discretion, is not necessarily true,  \
 \
 There are no NA values. However, from the summary we can see that there are variables with impossible values: specifically, *ap_hi* and *ap_lo* have in some cases negative values, which don't make sense even for a dead person, and in other cases extremely high values.
 The highest pressure recorded in an individual was 370/360 [@narloch1995influence].
@@ -76,85 +85,117 @@ The highest pressure recorded in an individual was 370/360 [@narloch1995influenc
 ```{r}
 summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
 cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo),]
+
+# save a copy of cardio with filtered values but without factor columns for clustering later on
+cardio_cl = cardio
 ```
 
 1274 observations have completely unrealistic values for either systolic or diastolic pressure (or both). In 274 of them, the systolic pressure is less than the diastolic, which is also not possible. These wrong metrics are less than 2% of our dataset, so the most straightforward approach is just to eliminate the problematic rows. \
 
 ```{r}
-cardio[c("gender", "cholesterol", "gluc", "smoke", "alco","active")] <- lapply(cardio[c("gender", "cholesterol", "gluc", "smoke", "alco","active")], factor)
-cardio$gender <- factor(cardio$gender, levels = c("F", "M"))
-cardio$cholesterol <- factor(cardio$cholesterol, levels = c("normal", "above normal", "well above normal"))
-cardio$gluc <- factor(cardio$gluc, levels = c("normal", "above normal", "well above normal"))
+cardio$gender <- factor(cardio$gender)
+levels(cardio$gender) = c("F", "M")
+head(cardio$gender)
+
+cardio$cardio <- as.factor(cardio$cardio)
+head(cardio$cardio)
+
+cardio$cholesterol <- factor(cardio$cholesterol)
+levels(cardio$cholesterol) = c("normal", "above normal", "well above normal")
+head(cardio$cholesterol)
+
+cardio$gluc <- factor(cardio$gluc)
+levels(cardio$gluc) = c("normal", "above normal", "well above normal")
+head(cardio$gluc)
+
+cardio$smoke <- factor(cardio$smoke)
+levels(cardio$smoke) = c("No", "Yes")
+head(cardio$smoke)
+
+cardio$alco <- factor(cardio$alco)
+levels(cardio$alco) = c("No", "Yes")
+head(cardio$alco)
+
+cardio$active <- factor(cardio$active)
+levels(cardio$active) = c("No", "Yes")
+head(cardio$active)
+
 ```
 
 ```{r age_categorizing}
 cardio$age = ceiling(cardio$age/365)
 cardio$age_cat <- ifelse(cardio$age >= 18 & cardio$age <= 35, 'Y', 
                          ifelse(cardio$age > 35 & cardio$age <= 55, 'S', 'E'))
-    
+table(cardio$age_cat)
+```
+There are virtually no observations concerning young people (< 35 years old): we remove them for clarity and we focus on senior and elderly.
+```{r}
+cardio = cardio %>% filter(age_cat == "S" | age_cat == "E")
+cardio$age_cat <- factor(cardio$age_cat)
+levels(cardio$age_cat) = c("Senior", "Elderly")
+head(cardio$age_cat)
 ```
 
-```{r}
-library(corrplot)
-library(reshape2)
-library(ggplot2)
-```
 
 
 ```{r}
-numerical <- cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
-categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
 table(cardio$cardio)
 ```
 The dataset is balanced with respect to the target variable.
+
+Let's divide our dataset between numerical and categorical variables and analyze what are, if any, the relationships between the variables.
 ```{r eval=FALSE, include=FALSE}
-corrplot(cor(as.matrix(cardio), method='pearson'))
+numerical <- cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
+categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
 ```
 
-```{r pressure, eval=FALSE, include=FALSE}
-#corrplot(cor(cardio))
-
-
-pairs(cardio[c("age", "height", "weight", "ap_hi", "ap_lo")])
-```
 ```{r eval=FALSE, include=FALSE}
+plot.new()
+
 pairs(numerical,
       labels = colnames(numerical),  
       pch = 21,
-      bg = rainbow(2)[as.factor(cardio$cardio)],
-      col = rainbow(2)[as.factor(cardio$cardio)], 
-      main = "Cardiovascular disease dataset",
+      bg = rainbow(2)[(cardio$cardio)],
+      col = rainbow(2)[(cardio$cardio)], 
+      main = "Cardiovascular disease dataset (numerical variables)",
       row1attop = TRUE,         # If FALSE, changes the direction of the diagonal
       gap = 1,                  # Distance between subplots
       cex.labels = NULL,        # Size of the diagonal text
       font.labels = 1)
+# Add the legend
+legend(
+  "topright",                           # Position of the legend
+  legend = c("No disease", "Disease"), # Labels for the categories
+  col = rainbow(2),                     # Colors corresponding to categories
+  pch = 21,                             # Point shape used in the plot
+  pt.bg = rainbow(2),                   # Background color for the points
+  bty = "n"                             # No border around the legend box
+)
 ```
-
+Let's visualize the distribution of the numerical variables as well
 ```{r eval=FALSE}
-panel.hist <- function(x, ...) {
-    usr <- par("usr")
-    on.exit(par(usr))
-    par(usr = c(usr[1:2], 0, 1.5))
-    his <- hist(x, plot = FALSE)
-    breaks <- his$breaks
-    nB <- length(breaks)
-    y <- his$counts
-    y <- y/max(y)
-    rect(breaks[-nB], 0, breaks[-1], y, col = rgb(0, 1, 1, alpha = 0.5), ...)
-    # lines(density(x), col = 2, lwd = 2) # Uncomment to add density lines
+# Define the number of variables
+num_vars <- ncol(numerical)
+
+# Set up a grid layout for larger histograms
+par(mfrow = c(ceiling(sqrt(num_vars)), ceiling(sqrt(num_vars)))) # Adjust grid based on number of variables
+par(mar = c(4, 4, 2, 1)) # Adjust margins for better spacing
+
+# Loop through each variable and create histograms
+for (i in 1:num_vars) {
+    hist(
+        numerical[[i]], 
+        col = rgb(0, 1, 1, alpha = 0.5), 
+        main = colnames(numerical)[i], 
+        xlab = "Value", 
+        ylab = "Frequency",
+        border = "white"
+    )
 }
 
-# Creating the scatter plot matrix
-pairs(numerical,
-      upper.panel = NULL,         # Disabling the upper panel
-      diag.panel = panel.hist)    # Adding the histograms
 ```
 
-
-
-
 Correlation analysis
-
 ```{r}
 cor_cardio = round(cor(as.data.frame(numerical)), 2)
 melt_cardio = melt(cor_cardio)
@@ -168,6 +209,11 @@ ggplot(data = melt_cardio, aes(x=Var1, y=Var2, fill=value)) +
         axis.title.y = element_blank(),
         panel.background = element_blank())
 ```
+The heatmap confirms some (perhaps rather intuitive) relationships:
+- Diastolic and systolic blood pressure are heavily correlated
+- Both weight and age are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.
+
+Let's now explore the possible relationships of the other categorical variables with cardio.
 
 ```{r}
 summary_table = as.data.frame(table(cardio$age_cat, cardio$cardio))
@@ -182,6 +228,204 @@ ggplot(summary_table, aes(x = age_cat, y = count, fill = as.factor(cardio))) +
     fill = "Cardio"
   ) +
   theme_minimal()
+```
+We see that, interestingly, a higher occurrence of heart disease occurs in senior patients (from 35 to 55) than in elderly patients: actually the majority of the first category is affected by heart disease, while rather surprisingly the majority of the elderly are not.
+
+We use the Chi-squared test to see to which degree the variables are correlated with cardio.
+```{r}
+categorical_vars = c("gender", "cholesterol", "gluc", "smoke", "alco", "active", "age_cat")
+p_values = c()
+for (i in categorical_vars){
+  corr = chisq.test(table(cardio$cardio, cardio[, i]))
+  p_values[i] = corr$p.value
+}
+which(p_values < 0.05)
+```
+We see that all of the variables available, beside gender, seem to be very relevant in determining the insurgence of heart diseases.
+
+Let's now test the mean differences between groups for dystolic and systolic blood pressure.
+```{r}
+continuous_vars = c("ap_hi", "ap_lo")
+mean_diff_results <- data.frame(
+    Variable = character(),
+    Group = character(),
+    Test = character(),
+    P_Value = numeric(),
+    stringsAsFactors = FALSE
+)
+# t_test = t.test(cardio[, "ap_hi"] ~ cardio[, "smoke"])
+# print(t_test)
+# 
+# anova_test = aov(cardio[, "ap_hi"] ~ cardio[, "gluc"])
+
+for (cont_var in continuous_vars) {
+  for (cat_var in categorical_vars) {
+    num_levels = length(unique(cardio[, cat_var]))
+    if (num_levels == 2) {
+      # Perform t-test
+      t_test = t.test(cardio[, cont_var] ~ cardio[, cat_var])
+      p_value = t_test$p.value
+      test_type = "t-test"
+    } else {
+      # Perform ANOVA
+      anova_test = aov(cardio[, cont_var] ~ cardio[, cat_var])
+      p_value = summary(anova_test)[[1]]["Pr(>F)"][1]
+      test_type = "ANOVA"
+    }
+    # Append results
+    results = data.frame(
+                                Variable = cont_var, 
+                                Group = cat_var, 
+                                Test = test_type,
+                                P_Value = p_value
+                              )
+    mean_diff_results = bind_rows(mean_diff_results, results)
+  }
+}
+# !!! IDK what is wrong with this loop
+
+# View results
+print(mean_diff_results)
+```
+Once again, there definitely are some significant differences between the groups considered.
+```{r}
+# just like in the example, we try to do "visual" clustering, see if there are any evident clusters by plotting data
+p1 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = cholesterol))
+p2 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = age_cat))
+p3 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = smoke))
+p4 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = active))
+p5 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = alco))
+p6 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = gluc))
+```
+
+```{r}
+grid.arrange(p1, p2, p3, p4)
+```
+
+```{r}
+grid.arrange(p5, p6, p7)
+```
+```{r}
+p8 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = cholesterol))
+p9 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = age_cat))
+p10 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = smoke))
+p11 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = active))
+p12 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = alco))
+p13 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = gluc))
+
+grid.arrange(p8, p9, p10, p11)
+```
+
+```{r}
+grid.arrange(p12, p13)
+```
+While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.
+```{r}
+count_disease_with_gluc = count(cardio %>% filter(gluc != "normal" & cardio == 1))$n
+count_disease_with_chol = cardio %>% filter(cholesterol != "normal" && cardio == 1)$n # opr maybe not: apparently there are no occurrences of disease with cholesterol above normal
+```
+
+## Clustering
+### K-means clustering
+```{r}
+# Scale the data to normalize the values
+cardio_data_scaled <- scale(cardio_cl)
+
+# View the first few rows of the dataset
+head(cardio_data_scaled)
+
+# Perform K-means clustering
+set.seed(123)  
+silhouette_scores = c()
+
+# Compute the distance matrix for the scaled data
+sample_cardio_data_scaled = sample(cardio_data_scaled, 10000)
+dist_matrix <- dist(sample_cardio_data_scaled)
+
+# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
+# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
+for (n_clusters in 2:10) {
+  # Perform k-means clustering
+  kmeans_result <- kmeans(sample_cardio_data_scaled, centers = n_clusters)
+  
+  # Extract cluster labels from the k-means result
+  cluster_labels <- kmeans_result$cluster
+  
+  # Calculate silhouette values
+  sil <- silhouette(cluster_labels, dist_matrix)
+  
+  # Store the average silhouette score for the current number of clusters
+  silhouette_scores[n_clusters] <- mean(sil[, 3])
+}
+max_silhouette_kmeans = which.max(silhouette_scores)
+
+best_kmeans_result <- kmeans(cardio_data_scaled, centers = max_silhouette_kmeans)
+
+
+# Add the cluster assignment to the original data
+cardio$Cluster <- as.factor(best_kmeans_result$cluster)
+
+# Visualize the clusters across different dimensions
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+cl_p3 = ggplot(cardio, aes(cardio, weight, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+
+
+grid.arrange(cl_p1, cl_p2)
+cl_p3 # the difference is much more blurried here
+```
+Plotting along the cardio and both types of pressures, the clusters seem to neatly separate the data along some pressure values. 
+
+Let's test for mean differences across them
+
+### Hierarchical clustering
+```{r}
+# Calculate the distance matrix
+dist_matrix <- dist(sample(cardio_data_scaled, 10000))
+
+# Perform hierarchical clustering
+hclust_result <- hclust(dist_matrix, method = "ward.D2")
+
+silhouette_scores = c()
+# Compute silhouette
+for (n_clusters in 2:10){
+  cluster_labels <- cutree(hclust_result, k = n_clusters)
+  sil <- silhouette(cluster_labels, dist_matrix)
+  silhouette_scores[n_clusters] = mean(sil[, 3])
+}
+
+best_n_cluster = which.max(silhouette_scores)
+
+# visualize the best performing cluster
+dend <- as.dendrogram(hclust_result)
+
+# Color branches by clusters
+dend <- color_branches(dend, k = 3)
+
+# Plot the dendrogram
+plot(dend, main = "Hierarchical Clustering with Colored Clusters")
+```
+
+```{r}
+# Plot silhouette (!!! IDK what is wrong with this as well)
+best_cluster_labels <- cutree(hclust_result, k = best_n_cluster)
+best_sil <- silhouette(best_cluster_labels, dist_matrix)
+plot(best_sil, main = "Best-performing Silhouette Plot for Clustering")
+```
+
+We now augment our dataset with the cluster group. 
+```{r}
+cardio_data_scaled$cluster <- best_cluster_labels
+
+# View the dataset with cluster labels
+head(cardio_data_scaled)
+
 ```
 
 ## References
