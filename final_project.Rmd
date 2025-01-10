@@ -121,16 +121,18 @@ levels(cardio$active) = c("No", "Yes")
 head(cardio$active)
 
 ```
-
-```{r age_categorizing}
+```{r}
 cardio$age = ceiling(cardio$age/365)
-cardio$age_cat <- ifelse(cardio$age >= 18 & cardio$age <= 35, 'Y', 
-                         ifelse(cardio$age > 35 & cardio$age <= 55, 'S', 'E'))
+min(cardio$age)
+```
+
+There are very little observations concerning young people (< 35 years old), and the youngest one in the sample is 30: we therefore split the sample into 2 age categories, senior and elderly.
+```{r age_categorizing}
+cardio$age_cat <- ifelse(cardio$age <= 55, 'S', 'E')
 table(cardio$age_cat)
 ```
-There are virtually no observations concerning young people (< 35 years old): we remove them for clarity and we focus on senior and elderly.
+
 ```{r}
-cardio = cardio %>% filter(age_cat == "S" | age_cat == "E")
 cardio$age_cat <- factor(cardio$age_cat)
 levels(cardio$age_cat) = c("Senior", "Elderly")
 head(cardio$age_cat)
@@ -244,21 +246,29 @@ which(p_values < 0.05)
 We see that all of the variables available, beside gender, seem to be very relevant in determining the insurgence of heart diseases.
 
 Let's now test the mean differences between groups for dystolic and systolic blood pressure.
+
 ```{r}
-continuous_vars = c("ap_hi", "ap_lo")
-mean_diff_results <- data.frame(
+continuous_vars = c("ap_hi", "ap_lo", "weight", "height")
+# mean_diff_results <- data.frame(
+#     Variable = character(),
+#     Group = character(),
+#     Test = character(),
+#     P_Value = numeric(),
+#     stringsAsFactors = FALSE
+# )
+# t_test = t.test(cardio[, "ap_hi"] ~ cardio[, "smoke"])
+# print(t_test)
+# 
+# anova_test = aov(cardio[, "ap_hi"] ~ cardio[, "gluc"])
+test_mean_diff = function(continuous_vars, categorical_vars){
+  mean_diff_results <- data.frame(
     Variable = character(),
     Group = character(),
     Test = character(),
     P_Value = numeric(),
     stringsAsFactors = FALSE
 )
-# t_test = t.test(cardio[, "ap_hi"] ~ cardio[, "smoke"])
-# print(t_test)
-# 
-# anova_test = aov(cardio[, "ap_hi"] ~ cardio[, "gluc"])
-
-for (cont_var in continuous_vars) {
+  for (cont_var in continuous_vars) {
   for (cat_var in categorical_vars) {
     num_levels = length(unique(cardio[, cat_var]))
     if (num_levels == 2) {
@@ -281,11 +291,39 @@ for (cont_var in continuous_vars) {
                               )
     mean_diff_results = bind_rows(mean_diff_results, results)
   }
-}
+  }
+return(mean_diff_results)
+  }
+
+# for (cont_var in continuous_vars) {
+#   for (cat_var in categorical_vars) {
+#     num_levels = length(unique(cardio[, cat_var]))
+#     if (num_levels == 2) {
+#       # Perform t-test
+#       t_test = t.test(cardio[, cont_var] ~ cardio[, cat_var])
+#       p_value = t_test$p.value
+#       test_type = "t-test"
+#     } else {
+#       # Perform ANOVA
+#       anova_test = aov(cardio[, cont_var] ~ cardio[, cat_var])
+#       p_value = summary(anova_test)[[1]]["Pr(>F)"][1]
+#       test_type = "ANOVA"
+#     }
+#     # Append results
+#     results = data.frame(
+#                                 Variable = cont_var, 
+#                                 Group = cat_var, 
+#                                 Test = test_type,
+#                                 P_Value = p_value
+#                               )
+#     mean_diff_results = bind_rows(mean_diff_results, results)
+#   }
+# }
 # !!! IDK what is wrong with this loop
 
 # View results
-print(mean_diff_results)
+result = test_mean_diff(continuous_vars, categorical_vars)
+print(result)
 ```
 Once again, there definitely are some significant differences between the groups considered.
 ```{r}
@@ -332,7 +370,7 @@ count_disease_with_chol = nrow(cardio[cardio$cholesterol != "normal" & cardio$ca
 ### K-means clustering
 ```{r}
 # Scale the data to normalize the values
-cardio_data_scaled <- scale(cardio_cl)
+cardio_data_scaled <- scale(cardio_cl[, -12])
 
 # View the first few rows of the dataset
 head(cardio_data_scaled)
@@ -340,33 +378,45 @@ head(cardio_data_scaled)
 # Perform K-means clustering
 set.seed(123)  
 silhouette_scores = c()
-
-# Compute the distance matrix for the scaled data
+#
+# # Compute the distance matrix for the scaled data
 sample_cardio_data_scaled = sample(cardio_data_scaled, 10000)
 dist_matrix <- dist(sample_cardio_data_scaled)
-
 # Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
 # Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
-for (n_clusters in 2:10) {
-  # Perform k-means clustering
-  kmeans_result <- kmeans(sample_cardio_data_scaled, centers = n_clusters)
-  
-  # Extract cluster labels from the k-means result
-  cluster_labels <- kmeans_result$cluster
-  
-  # Calculate silhouette values
-  sil <- silhouette(cluster_labels, dist_matrix)
-  
-  # Store the average silhouette score for the current number of clusters
-  silhouette_scores[n_clusters] <- mean(sil[, 3])
-}
+ for (n_clusters in 2:10) {
+   # Perform k-means clustering
+   kmeans_result <- kmeans(sample_cardio_data_scaled, centers = n_clusters)
+
+   # Extract cluster labels from the k-means result
+   cluster_labels <- kmeans_result$cluster
+
+   # Calculate silhouette values
+   sil <- silhouette(cluster_labels, dist_matrix)
+
+   # Store the average silhouette score for the current number of clusters
+   silhouette_scores[n_clusters] <- mean(sil[, 3])
+ }
+
 max_silhouette_kmeans = which.max(silhouette_scores)
 
 best_kmeans_result <- kmeans(cardio_data_scaled, centers = max_silhouette_kmeans)
-
-
 # Add the cluster assignment to the original data
 cardio$Cluster <- as.factor(best_kmeans_result$cluster)
+str(best_kmeans_result)
+fviz_cluster(best_kmeans_result, data = nor)
+
+install.packages("MatrixModels")
+install.packages("quantreg")
+install.packages("car")
+install.packages("rstatix")
+install.packages("FactoMineR")
+install.packages("ggpubr")
+
+```
+
+```{r}
+
 
 # Visualize the clusters across different dimensions
 cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
@@ -375,17 +425,53 @@ cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
 cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
   geom_point() +
   labs(title = "K-Means Clustering (cardio vs ap_lo)")
-cl_p3 = ggplot(cardio, aes(cardio, weight, color = Cluster)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (cardio vs ap_lo)")
-
 
 grid.arrange(cl_p1, cl_p2)
-cl_p3 # the difference is much more blurried here
 ```
 Plotting along the cardio and both types of pressures, the clusters seem to neatly separate the data along some pressure values. 
+```{r}
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+grid.arrange(cl_p3, cardio_pl)
+```
+Plotting `ap_hi` against `ap_lo`, the division is even more evident: and it somehow resembles the boundaries described by the `cardio` variable itself.
 
-Let's test for mean differences across them
+Let's test for mean differences across clusters
+```{r}
+info_cluster1 = cardio %>% filter(Cluster == 1)
+summary(info_cluster1)
+```
+```{r}
+info_cluster2 = cardio %>% filter(Cluster == 2)
+summary(info_cluster2)
+```
+It seems there are way more individuals with higher values of `cholesterol` and `gluc` in the second cluster. Furthermore, here seniors are the majority, while the first one consists mostly of elderly individuals.
+```{r}
+cluster_differences = c()
+for (i in continuous_vars){
+  wilcox_test_result <- wilcox.test(ap_hi ~ Cluster, data = cardio)
+  cluster_differences[i] = wilcox_test_result$p.value
+  print(wilcox_test_result$p.value)
+}
+
+for (i in categorical_vars){
+  # Create a contingency table
+  contingency_table <- table(cardio[[i]], cardio$Cluster)
+
+  # Perform the Chi-Square test
+  chi_square_result <- chisq.test(contingency_table)
+  cluster_differences[i] = chi_square_result$p.value
+  print(chi_square_result$p.value)
+}
+
+```
+The clusters are very different across all metrics, not only those we supposed.
+Summarizing our result, there seems to be a "healthier" group (cluster 1), where there are less people with high values of `cholesterol` and `gluc`, less drinkers, more active people, more elderly individuals and, finally, more females. 
+Roughly 75% of cluster 1 doesn't have heart diseases, while 87 % of cluster 2 does.
 
 ### Hierarchical clustering
 ```{r}
