@@ -54,7 +54,7 @@ The analysis is centered around the prediction of presence of cardiovascular dis
 Firstly, an exploratory analysis has been conducted, with the purpose of identifying problems and have at a glance an idea of meaning and distribution of the variables.
 
 ```{r 'Explorative analysis and data cleaning'}
-cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
+cardio_with_id <- read.csv("C:/Statistical methods/data/cardio_train.csv", sep= ";", header=TRUE)
 cardio <- cardio_with_id[,-1]
 sum(as.numeric(is.na(cardio)))
 str(cardio)
@@ -144,7 +144,7 @@ table(cardio$cardio)
 The dataset is balanced with respect to the target variable.
 
 Let's divide our dataset between numerical and categorical variables and analyze what are, if any, the relationships between the variables.
-```{r eval=FALSE, include=FALSE}
+```{r eval=TRUE, include=TRUE}
 numerical <- cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
 categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
 ```
@@ -173,7 +173,7 @@ legend(
 )
 ```
 Let's visualize the distribution of the numerical variables as well
-```{r eval=FALSE}
+```{r eval=TRUE}
 # Define the number of variables
 num_vars <- ncol(numerical)
 
@@ -298,12 +298,14 @@ p5 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = alco))
 p6 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = gluc))
 ```
 
+
+
 ```{r}
-grid.arrange(p1, p2, p3, p4)
+grid.arrange(p1, p2, p3, p4) #NOTE: TOO MANY TO VISUALIZE WELL, SO JITTER COULD BE USED!!!
 ```
 
 ```{r}
-grid.arrange(p5, p6, p7)
+grid.arrange(p5,p6)
 ```
 ```{r}
 p8 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = cholesterol))
@@ -321,8 +323,9 @@ grid.arrange(p12, p13)
 ```
 While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.
 ```{r}
-count_disease_with_gluc = count(cardio %>% filter(gluc != "normal" & cardio == 1))$n
-count_disease_with_chol = cardio %>% filter(cholesterol != "normal" && cardio == 1)$n # opr maybe not: apparently there are no occurrences of disease with cholesterol above normal
+count_disease_with_gluc <- nrow(cardio[cardio$gluc != "normal" & cardio$cardio == 1, ])
+count_disease_with_chol = nrow(cardio[cardio$cholesterol != "normal" & cardio$cardio == 1, ])
+ # opr maybe not: apparently there are no occurrences of disease with cholesterol above normal
 ```
 
 ## Clustering
