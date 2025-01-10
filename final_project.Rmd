@@ -361,10 +361,45 @@ grid.arrange(p8, p9, p10, p11)
 grid.arrange(p12, p13)
 ```
 While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.
-```{r}
-count_disease_with_gluc <- nrow(cardio[cardio$gluc != "normal" & cardio$cardio == 1, ])
-count_disease_with_chol = nrow(cardio[cardio$cholesterol != "normal" & cardio$cardio == 1, ])
- # opr maybe not: apparently there are no occurrences of disease with cholesterol above normal
+
+```{r barplots}
+cholesterol_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, cholesterol = cardio$cholesterol), 
+  FUN = sum
+)
+
+cholesterol_data$total <- ave(cholesterol_data$count, cholesterol_data$cardio, FUN = sum)
+cholesterol_data$percentage <- (cholesterol_data$count / cholesterol_data$total) * 100
+
+pChol <- ggplot(cholesterol_data, aes(x = as.factor(cardio), y = count, fill = cholesterol)) +
+  geom_bar(stat = "identity", position = "stack") +  # Stacked bars based on count
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(title = "Population by Cholesterol \nand disease presence", x = expression(paste("\u2003\u2003","Cardio (0 = No Disease, 1 = Disease)")), y = "Count", fill = "Cholesterol") +
+  theme(plot.margin = margin(1, 1, 1, 2))
+
+glucose_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, gluc = cardio$gluc), 
+  FUN = sum
+)
+
+glucose_data$total <- ave(glucose_data$count, glucose_data$cardio, FUN = sum)
+glucose_data$percentage <- (glucose_data$count / glucose_data$total) * 100
+
+pGluc <- ggplot(glucose_data, aes(x = as.factor(cardio), y = count, fill = gluc)) +
+  geom_bar(stat = "identity", position = "stack") +  # Stacked bars based on count
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Glucose \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Glucose"
+  ) +
+  theme_minimal()
+grid.arrange(pChol, pGluc,ncol = 2)
 ```
 
 ## Clustering
