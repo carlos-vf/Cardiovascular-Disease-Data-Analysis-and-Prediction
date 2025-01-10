@@ -41,6 +41,7 @@ library(dplyr)
 library(patchwork)
 library(gridExtra)
 library(dendextend)
+library(factoextra)
 # Assess clusters
 library(cluster)
 ```
@@ -54,7 +55,7 @@ The analysis is centered around the prediction of presence of cardiovascular dis
 Firstly, an exploratory analysis has been conducted, with the purpose of identifying problems and have at a glance an idea of meaning and distribution of the variables.
 
 ```{r 'Explorative analysis and data cleaning'}
-cardio_with_id <- read.csv("C:/Statistical methods/data/cardio_train.csv", sep= ";", header=TRUE)
+cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
 cardio <- cardio_with_id[,-1]
 sum(as.numeric(is.na(cardio)))
 str(cardio)
@@ -404,15 +405,7 @@ best_kmeans_result <- kmeans(cardio_data_scaled, centers = max_silhouette_kmeans
 # Add the cluster assignment to the original data
 cardio$Cluster <- as.factor(best_kmeans_result$cluster)
 str(best_kmeans_result)
-fviz_cluster(best_kmeans_result, data = nor)
-
-install.packages("MatrixModels")
-install.packages("quantreg")
-install.packages("car")
-install.packages("rstatix")
-install.packages("FactoMineR")
-install.packages("ggpubr")
-
+fviz_cluster(best_kmeans_result, data = cardio_data_scaled)
 ```
 
 ```{r}
