@@ -28,12 +28,24 @@ references:
     issued:
       year: 1995
     publisher: "Elsevier"
+  - id: cardiovascular_disease_dataset
+    author:
+      - family: "Ulianova"
+        given: "Svetlana"
+    title: "Cardiovascular Disease Dataset"
+    URL: "https://www.kaggle.com/datasets/sulianova/cardiovascular-disease-dataset"
+    accessed:
+      year: 2025
+      month: 1
+      day: 9
+    type: dataset
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-```{r}
+
+```{r libraries}
 library(corrplot)
 library(reshape2)
 library(ggplot2)
@@ -42,13 +54,15 @@ library(patchwork)
 library(gridExtra)
 library(dendextend)
 library(factoextra)
+library(rpart)
+library(rpart.plot)
 # Assess clusters
 library(cluster)
 ```
 
 ## Introduction
 
-The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
+The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset]. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
 
 ## Data exploration
 
@@ -120,7 +134,6 @@ head(cardio$alco)
 cardio$active <- factor(cardio$active)
 levels(cardio$active) = c("No", "Yes")
 head(cardio$active)
-
 ```
 ```{r}
 cardio$age = ceiling(cardio$age/365)
@@ -414,8 +427,8 @@ head(cardio_data_scaled)
 # Perform K-means clustering
 set.seed(123)  
 silhouette_scores = c()
-#
-# # Compute the distance matrix for the scaled data
+
+# Compute the distance matrix for the scaled data
 sample_cardio_data_scaled = sample(cardio_data_scaled, 10000)
 dist_matrix <- dist(sample_cardio_data_scaled)
 # Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
@@ -542,7 +555,69 @@ cardio_data_scaled$cluster <- best_cluster_labels
 
 # View the dataset with cluster labels
 head(cardio_data_scaled)
+```
+
+
+
+## Classification Trees
+
+```{r classification trees (high cp)}
+# Split data (train/test)
+set.seed(123)
+train_index <- sample(1:nrow(cardio_cl), 0.8 * nrow(cardio_cl))  
+train_data <- cardio_cl[train_index, ]
+test_data <- cardio_cl[-train_index, ]
+
+# Build and plot the classification tree
+tree <- rpart(cardio ~ ., data = train_data, method = "class")
+rpart.plot(tree)
+
+# Check feature importance
+tree$variable.importance
+
+# Make predictions
+predictions <- predict(tree, test_data, type = "class")
+
+# Confusion matrix
+confusion_matrix <- table(Predicted = predictions, Actual = test_data$cardio)
+confusion_matrix
+
+# Accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
 
 ```
+At first sight, we can observe that the classification tree completely relies on the feature `ap_hi` for the only split. After checking the importance of the difference features, this one, together with `ap_lo`, out stand over the others. Even though both of them are significant, they are highly correlated, so taking them into account at the same time would introduce redundancy in the tree.
+
+Let's check the control parameters in the building of the model:
+```{r}
+# Control parameters
+tree$control
+```
+Could we improve the performance of the model with more splits? In order to force the tree to use less relevant features, we will readjust some of this parameters. Specifically, we will reduce the complexity parameter (`cp`).
+```{r classification trees (low cp)}
+# New classification tree
+tree <- rpart(cardio ~ ., data = train_data, method = "class",
+              control = rpart.control(cp = 0.001))
+rpart.plot(tree)
+
+# Check feature importance
+tree$variable.importance
+
+# Make predictions
+predictions <- predict(tree, test_data, type = "class")
+
+# Confusion matrix
+confusion_matrix <- table(Predicted = predictions, Actual = test_data$cardio)
+confusion_matrix
+
+# Accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+```
+
+After evaluating the model, we get a sightly better accuracy from a significantly more complex tree. From this comparison, we can conclude that the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases. 
+
+
 
 ## References
