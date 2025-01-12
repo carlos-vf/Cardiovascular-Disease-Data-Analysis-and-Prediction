@@ -46,18 +46,20 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r libraries}
+library(cluster)
 library(corrplot)
-library(reshape2)
-library(ggplot2)
-library(dplyr)
-library(patchwork)
-library(gridExtra)
 library(dendextend)
+library(dplyr)
 library(factoextra)
+library(ggplot2)
+library(gridExtra)
+library(patchwork)
+library(parallel)
+library(pROC)
+library(ranger)
+library(reshape2)
 library(rpart)
 library(rpart.plot)
-# Assess clusters
-library(cluster)
 ```
 
 ## Introduction
@@ -564,6 +566,7 @@ head(cardio_data_scaled)
 ```{r classification trees (high cp)}
 # Split data (train/test)
 set.seed(123)
+cardio_cl$cardio <- as.factor(cardio_cl$cardio)
 train_index <- sample(1:nrow(cardio_cl), 0.8 * nrow(cardio_cl))  
 train_data <- cardio_cl[train_index, ]
 test_data <- cardio_cl[-train_index, ]
@@ -576,16 +579,26 @@ rpart.plot(tree)
 tree$variable.importance
 
 # Make predictions
-predictions <- predict(tree, test_data, type = "class")
+predictions <- predict(tree, test_data, type = "prob")
+
+# Convert probabilities to predicted classes
+predicted_classes <- ifelse(predictions[, 2] > 0.5, 1, 0)
 
 # Confusion matrix
-confusion_matrix <- table(Predicted = predictions, Actual = test_data$cardio)
+confusion_matrix <- table(Predicted = predicted_classes, Actual = test_data$cardio)
 confusion_matrix
 
 # Accuracy
 accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
 print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
 
+# ROC curve
+roc_curve <- roc(test_data$cardio, predictions[, 2])
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+
+# AUC
+auc_value <- auc(roc_curve)
+print(paste("AUC:", round(auc_value, 4)))
 ```
 At first sight, we can observe that the classification tree completely relies on the feature `ap_hi` for the only split. After checking the importance of the difference features, this one, together with `ap_lo`, out stand over the others. Even though both of them are significant, they are highly correlated, so taking them into account at the same time would introduce redundancy in the tree.
 
@@ -605,19 +618,71 @@ rpart.plot(tree)
 tree$variable.importance
 
 # Make predictions
-predictions <- predict(tree, test_data, type = "class")
+predictions <- predict(tree, test_data, type = "prob")
+
+# Convert probabilities to predicted classes
+predicted_classes <- ifelse(predictions[, 2] > 0.5, 1, 0)
 
 # Confusion matrix
-confusion_matrix <- table(Predicted = predictions, Actual = test_data$cardio)
+confusion_matrix <- table(Predicted = predicted_classes, Actual = test_data$cardio)
 confusion_matrix
 
 # Accuracy
 accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
 print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+
+# ROC curve
+roc_curve <- roc(test_data$cardio, predictions[, 2])
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+
+# AUC
+auc_value <- auc(roc_curve)
+print(paste("AUC:", round(auc_value, 4)))
 ```
 
-After evaluating the model, we get a sightly better accuracy from a significantly more complex tree. From this comparison, we can conclude that the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases. 
+After evaluating the model, we get a sightly better accuracy from a significantly more complex tree. Moreover, the area under the ROC curve also increases (from 0.7056 to 0.7770). From this comparison, we can conclude that although the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases, observing other variables like cholesterol, weight, age or glucose also helps to identify them.
 
+
+## Random Forest
+
+Following classification trees, a natural approximation is fitting a random forest model. Let's keep the default parameters:
+
+- `num.trees = 500`: the number of decision trees.
+- `mtry = sqrt(F)`: the number of features to use in each decision tree, where *F* is the total number of features.
+
+```{r random forest}
+# Random forest
+rf_model <- ranger(cardio ~ ., data = train_data, probability = TRUE, num.threads = detectCores())
+rf_model
+
+# Predict on test data
+predictions <- predict(rf_model, data = test_data)
+
+# Convert probabilities to predicted classes
+predicted_classes <- ifelse(predictions$predictions[, 2] > 0.5, 1, 0)
+predicted_classes <- as.factor(predicted_classes)
+
+# Confusion matrix
+confusion_matrix <- table(Predicted = predicted_classes, Actual = test_data$cardio)
+
+# Accuracy
+accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
+print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+```
+Let's check the area under the ROC curve:
+
+```{r}
+# Compute the ROC curve
+roc_curve <- roc(test_data$cardio, predictions$predictions[, 2])
+
+# Compute the AUC
+auc_value <- auc(roc_curve)
+print(paste("AUC:", round(auc_value, 4)))
+
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+```
+
+As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
 
 ## References
