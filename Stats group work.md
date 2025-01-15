@@ -1,0 +1,9 @@
+- Try k-modes clustering/ fix clustering for categorical variables
+- add logistic regression:
+	- try polynomial regression (age)
+	- try interaction terms (cholesterol, active)
+	- compare models with AIC/BIC
+- compare logistic regression, random forest (and possibly other models: splines?)
+- Interpret result where possible:
+	- Coefficients in Logistic regression and their significance
+	- Variable importance and impurity in random forests
