@@ -46,9 +46,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r libraries}
+library(caret)
 library(cluster)
 library(corrplot)
 library(dendextend)
+library(doParallel)
 library(dplyr)
 library(factoextra)
 library(ggplot2)
@@ -731,35 +733,69 @@ Following classification trees, a natural approximation is fitting a random fore
 - `num.trees = 500`: the number of decision trees.
 - `mtry = sqrt(F)`: the number of features to use in each decision tree, where *F* is the total number of features.
 
-```{r random forest}
-# Random forest
-rf_model <- ranger(cardio ~ ., data = train_data, probability = TRUE, num.threads = detectCores())
-rf_model
+```{r parellization}
+# Detect the number of cores available on your machine
+cores <- parallel::detectCores()
 
-# Predict on test data
-predictions <- predict(rf_model, data = test_data)
-
-# Convert probabilities to predicted classes
-predicted_classes <- ifelse(predictions$predictions[, 2] > 0.5, 1, 0)
-predicted_classes <- as.factor(predicted_classes)
-
-# Confusion matrix
-confusion_matrix <- table(Predicted = predicted_classes, Actual = test_data$cardio)
-
-# Accuracy
-accuracy <- sum(diag(confusion_matrix)) / sum(confusion_matrix)
-print(paste("Accuracy:", round(accuracy * 100, 2), "%"))
+# Register the parallel backend with the desired number of cores (e.g., all cores)
+cl <- makeCluster(cores)  # Create a cluster with the detected cores
+registerDoParallel(cl)    # Register the parallel backend
 ```
-Let's check the area under the ROC curve:
 
-```{r}
-# Compute the ROC curve
-roc_curve <- roc(test_data$cardio, predictions$predictions[, 2])
 
-# Compute the AUC
-auc_value <- auc(roc_curve)
-print(paste("AUC:", round(auc_value, 4)))
+```{r random forest (training)}
+# Factorize the variable if it is not a factor
+if (!is.factor(cardio_cl$cardio)) {
+  cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
+} else {
+  # Refactor the variable with the correct levels
+  if (!all(levels(cardio_cl$cardio) %in% c("No", "Yes"))) {
+    cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
+  }
+}
 
+# Cross-validation setup
+train_control <- trainControl(
+  method = "cv",          
+  number = 5,           # Folds
+  classProbs = TRUE,     # Enable probabilities
+  summaryFunction = twoClassSummary
+)
+
+tune <- expand.grid(
+    mtry = c(2),
+    splitrule = c("gini"),
+    min.node.size = c(1)
+)
+
+rf_model <- train(
+  cardio ~ ., 
+  data = cardio_cl,
+  method = "ranger",
+  trControl = train_control,
+  tuneGrid = tune,
+  metric = "ROC"
+)
+
+# Free resources
+stopCluster(cl)
+
+# Final model
+print(rf_model)
+```
+
+
+```{r random forest (performance)}
+# Get predicted probabilities
+predictions <- rf_model$finalModel$predictions
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- cardio_cl$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve <- roc(actual_labels, predicted_probs)
+print(paste("AUC:", auc(roc_curve)))
+
+# ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 ```
 
