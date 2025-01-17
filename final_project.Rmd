@@ -181,12 +181,12 @@ The dataset contains 70000 observations of 12 variables. The source doesn't spec
 
 The last three variables are marked as "subjective", meaning that this piece of information is likely supplied by patients themselves, possibly using different metrics.\
 \
-There are no NA values. However, from the summary we can see that there are variables with impossible values: specifically, *ap_hi* and *ap_lo* have in some cases negative values, which don't make sense even for a dead person, and in other cases extremely high values. A cut-off value value for the blood pressure is selected (generously) by basing on a study that measured blood pressure during intense exercise, and found a maximum pressure of 370/360
-[@narloch1995influence].
+There are no NA values. However, from the summary we can see that there are variables with impossible values: specifically, *ap_hi* and *ap_lo* have in some cases negative values, which don't make sense even for a dead person, and in other cases extremely high values. A cut-off value value for the blood pressure is selected (generously) by basing on a study that measured blood pressure during intense exercise, and found a maximum pressure of 370/360 while using the Valsalva and a maximum of 250/230 without it 
+[@narloch1995influence]. 
 
 ```{r}
 summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
-cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo),]
+cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo | cardio$ap_hi-cardio$ap_lo > 250),]
 
 # save a copy of cardio with filtered values but without factor columns for clustering later on
 cardio_cl = cardio
@@ -222,12 +222,22 @@ cardio$active <- factor(cardio$active)
 levels(cardio$active) = c("No", "Yes")
 #head(cardio$active)
 ```
+```{r}
+table(cardio$cardio)
+```
+
+The dataset is balanced with respect to the target variable.\
+Dividing age by 365 to obtain it in years:
 
 ```{r}
 cardio$age = ceiling(cardio$age/365)
 summary(cardio$age)
-boxplot(cardio$age, col = "skyblue")
-
+ggplot(cardio, aes(y = age)) +
+  geom_boxplot(fill = "skyblue", color = "black") + labs(
+    y = "Age"                                       
+  ) +
+  theme_minimal()   
+nrow(cardio[cardio$age<40,])
 ```
 
 There are only 4 observations concerning people < 40 years old, and the youngest one in the sample is 30: for this reason, we split between under (or equal to) and over 55.
@@ -241,16 +251,8 @@ table(cardio$age_cat)
 cardio$age_cat <- factor(cardio$age_cat)
 #levels(cardio$age_cat) = c("Senior", "Elderly")
 levels(cardio$age_cat) = c("Under 55", "Over 55")
-head(cardio$age_cat)
 ```
 
-
-
-```{r}
-table(cardio$cardio)
-```
-
-The dataset is balanced with respect to the target variable.
 
 Numerical and categorical variables are specified for convenience:
 
@@ -259,45 +261,63 @@ numerical <- cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
 categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
 ```
 
-We now proceed to analyze the distribution of the variables and the relationships between them:
-
-```{r eval=FALSE, include=TRUE}
-custom_colors <- c("#619CFF", "#F8766D")
-
-plot.new()
-pairs(numerical,
-      labels = colnames(numerical),  
-      pch = 21,
-      bg = custom_colors[as.numeric(cardio$cardio) + 1],  
-      col = custom_colors[as.numeric(cardio$cardio) + 1],  
-      main = "Cardiovascular disease dataset (numerical variables)",
-      row1attop = TRUE,         
-      gap = 1,                  
-      cex.labels = NULL,        
-      font.labels = 1)
-
-legend(
-  "topright",                           
-  legend = c("No disease", "Disease"),  
-  col = custom_colors,                  
-  pch = 21,                             
-  pt.bg = custom_colors,                
-  bty = "n"                             
-)
-
-```
-
-
-
 ```{r eval=TRUE}
 num_vars <- ncol(numerical)
 par(mfrow = c(ceiling(sqrt(num_vars)), floor(sqrt(num_vars)))) 
 for (i in 1:num_vars) {
     hist(
-        numerical[[i]], col = "skyblue",main=colnames(numerical)[i], xlab = "Value", ylab = "Frequency", border = "white"   )
+        numerical[[i]], col = "skyblue",main=colnames(numerical)[i], xlab = "Value", ylab = "Frequency", border = "black"   )
 }
 
 ```
+
+We now proceed to plot the distribution of the numerical variables, with respect to the disease status:
+
+```{r}
+library(GGally)
+library(ggplot2)
+
+gdens1<- ggplot(cardio, aes(x = ap_hi, fill = factor(cardio))) +
+  geom_density(alpha = 0.5,bw = 4) +  
+  scale_fill_manual(values = c("0" = "royalblue", "1" = "lightcoral")) +
+  labs(fill = "Cardiovascular disease", x = "Systolic pressure") +  
+  theme_minimal() +  
+  theme(legend.position = "top")
+gdens2<-ggplot(cardio, aes(x = ap_lo, fill = factor(cardio))) +
+  geom_density(alpha = 0.5,bw = 4) +  
+  scale_fill_manual(values = c("0" = "royalblue", "1" = "lightcoral")) + 
+  labs(fill = "Cardiovascular disease", x = "Diastolic pressure") +  
+  theme_minimal() +  
+  theme(legend.position = "top")
+gdens3<-ggplot(cardio, aes(x = ap_hi-ap_lo, fill = factor(cardio))) +
+  geom_density(alpha = 0.5,bw = 4) + 
+  scale_fill_manual(values = c("0" = "royalblue", "1" = "lightcoral")) + 
+  labs(fill = "Cardiovascular disease", x = "Pulse pressure") + 
+  theme_minimal() +
+  theme(legend.position = "top")
+gdens4<-ggplot(cardio, aes(x = height, fill = factor(cardio))) +
+  geom_density(alpha = 0.5,bw = 2) + 
+  scale_fill_manual(values = c("0" = "royalblue", "1" = "lightcoral")) + 
+  labs(fill = "Cardiovascular disease", x = "Height") + 
+  theme_minimal() +
+  theme(legend.position = "top")
+gdens5<-ggplot(cardio, aes(x = weight, fill = factor(cardio))) +
+  geom_density(alpha = 0.5,bw = 2) + 
+  scale_fill_manual(values = c("0" = "royalblue", "1" = "lightcoral")) + 
+  labs(fill = "Cardiovascular disease", x = "Weight") + 
+  theme_minimal() +
+  theme(legend.position = "top")
+gdens6<-ggplot(cardio, aes(x = age, fill = factor(cardio))) +
+  geom_density(alpha = 0.5,bw = 1) + 
+  scale_fill_manual(values = c("0" = "royalblue", "1" = "lightcoral")) + 
+  labs(fill = "Cardiovascular disease", x = "Age") + 
+  theme_minimal() +
+  theme(legend.position = "top")
+grid.arrange(gdens1,gdens2, nrow = 2)
+grid.arrange(gdens3,gdens6, nrow = 2)
+grid.arrange(gdens4,gdens5, nrow = 2)
+```
+
 
 Correlation analysis
 
@@ -319,35 +339,78 @@ The heatmap confirms some (perhaps rather intuitive) relationships:\
 - Diastolic and systolic blood pressure are heavily correlated\
 - Both weight and age are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.\
 
-Let's now explore the possible relationships of the other categorical variables with cardio.
+Let's now explore the possible relationships of the categorical variables with cardio.
 
-```{r}
-summary_table = as.data.frame(table(cardio$age_cat, cardio$cardio))
-colnames(summary_table) <- c("age_cat", "cardio", "count")
+```{r barplots}
 
-ggplot(summary_table, aes(x = age_cat, y = count, fill = as.factor(cardio))) +
-  geom_bar(stat = "identity", position = "dodge") +
-  labs(
-    title = "Counts of Cardio Diseases by Age Category",
-    x = "Age Category",
-    y = "Count",
-    fill = "Cardio"
-  ) + scale_fill_manual(
-    values = c("0" = "#619CFF", "1" = "#F8766D"))+
-  theme_minimal()
+stacked_bplot <- function(data, x, fill, fill_colors, title, x_label, y_label, fill_label) {
+  data <- aggregate(x = list(count = rep(1, nrow(data))), by = list(cardio = data$cardio, group = data[[fill]]), FUN = sum)
+  data$total <- ave(data$count, data$cardio, FUN = sum)
+  data$percentage <- (data$count / data$total) * 100
+  ggplot(data, aes(x = as.factor(cardio), y = count, fill = as.factor(group))) +
+    geom_bar(stat = "identity", position = "stack") +
+    geom_text(aes(label = paste0(round(percentage, 1), "%")), position = position_stack(vjust = 0.5), size = 3) +
+    labs(title = title, x = x_label, y = y_label, fill = fill_label) +
+    scale_fill_manual(values = fill_colors) +
+    theme_minimal()
+}
+
+pChol <- stacked_bplot(cardio, "cardio", "cholesterol", c("royalblue", "gold", "lightcoral"),
+  "Population by Cholesterol \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Cholesterol"
+)
+
+pGluc <- stacked_bplot(cardio, "cardio", "gluc", c("royalblue", "gold", "lightcoral"),
+  "Population by Glucose \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Glucose"
+)
+
+pSmoke <- stacked_bplot(cardio, "cardio", "smoke", c("royalblue", "lightcoral"),
+  "Population by Smoking Status \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Smoking"
+)
+
+pActive <- stacked_bplot(cardio, "cardio", "active", c("lightcoral", "royalblue"),
+  "Population by Physical Activity \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Active"
+)
+
+pAlco <- stacked_bplot(cardio, "cardio", "alco", c("royalblue", "lightcoral"),
+  "Population by Alcohol Consumption \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Alcohol"
+)
+
+pGender <- stacked_bplot(cardio, "cardio", "gender", c("lightcoral", "royalblue"),
+  "Population by Gender \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Gender"
+)
+
+pAgeCat <- stacked_bplot(cardio, "cardio", "age_cat", c("royalblue", "lightcoral"),
+  "Population by Age Category \nand disease presence", "Cardio (0 = No Disease, 1 = Disease)", "Count", "Age Category"
+)
+
+grid.arrange(pChol, pGluc, ncol = 2)
+grid.arrange(pSmoke, pActive, ncol = 2)
+grid.arrange(pAlco, pGender, ncol = 2)
+grid.arrange(pAgeCat, ncol = 2)
+
 ```
 
 As expected, cardiovascular diseases are more common in the older age group.\
 We use the Chi-squared test to see to which degree the variables are correlated with cardio:
 
 ```{r}
-categorical_vars = c("gender", "cholesterol", "gluc", "smoke", "alco", "active", "age_cat")
-p_values = c()
-for (i in categorical_vars){
-  corr = chisq.test(table(cardio$cardio, cardio[, i]))
-  p_values[i] = corr$p.value
+categorical_vars <- c("gender", "cholesterol", "gluc", "smoke", "alco", "active", "age_cat")
+test_results <- list()
+
+for (var in categorical_vars) {
+  test <- chisq.test(table(cardio$cardio, cardio[[var]]))
+  test_results[[var]] <- test
 }
-which(p_values < 0.05)
+
+for (var in categorical_vars) {
+  cat("Chi-Squared Test for", var, ":\n")
+  print(test_results[[var]])
+  cat("\n")
+}
+
+significant_vars <- names(test_results)[sapply(test_results, function(x) x$p.value < 0.05)]
+cat("Variables with significant association (p < 0.05):\n")
+print(significant_vars)
 ```
 
 We see that all of the available categorical variables, besides gender, seem to be very relevant in determining the insurgence of heart diseases.
