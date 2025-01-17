@@ -13,7 +13,9 @@ output:
 editor_options: 
   markdown: 
     wrap: 72
+    
 references:
+  
   - id: narloch1995influence
     title: "Influence of breathing technique on arterial blood pressure during heavy weight lifting"
     author:
@@ -28,6 +30,26 @@ references:
     issued:
       year: 1995
     publisher: "Elsevier"
+    
+  - id: breiman1984classification
+    title: "Classification and Regression Trees"
+    author:
+      - family: "Breiman"
+        given: "L."
+      - family: "Friedman"
+        given: "J."
+      - family: "Olshen"
+        given: "R.A."
+      - family: "Stone"
+        given: "C.J."
+    edition: "1st"
+    publisher: "Chapman and Hall/CRC"
+    issued:
+      year: 1984
+    URL: "https://doi.org/10.1201/9781315139470"
+    DOI: "10.1201/9781315139470"
+
+    
   - id: cardiovascular_disease_dataset
     author:
       - family: "Ulianova"
@@ -39,34 +61,95 @@ references:
       month: 1
       day: 9
     type: dataset
+    
+  - id: bertsimas2017optimal
+    title: "Optimal classification trees"
+    author:
+      - family: "Bertsimas"
+        given: "Dimitris"
+      - family: "Dunn"
+        given: "Jack"
+    container-title: "Machine Learning"
+    volume: 106
+    issue: 7
+    page: "1039-1082"
+    issued:
+      year: 2017
+      month: 7
+      day: 1
+    publisher: "Springer"
+    URL: "https://doi.org/10.1007/s10994-017-5633-9"
+    DOI: "10.1007/s10994-017-5633-9"
+  
+  - id: breiman2001random
+    title: "Random Forests"
+    author:
+      - family: "Breiman"
+        given: "Leo"
+    container-title: "Machine Learning"
+    volume: 45
+    issue: 1
+    page: "5-32"
+    issued:
+      year: 2001
+      month: 10
+      day: 1
+    URL: "https://doi.org/10.1023/A:1010933404324"
+    DOI: "10.1023/A:1010933404324"
+
+  - id: hastie2009elements
+    title: "The Elements of Statistical Learning"
+    author:
+      - family: "Hastie"
+        given: "Trevor"
+      - family: "Tibshirani"
+        given: "Robert"
+      - family: "Friedman"
+        given: "Jerome"
+    edition: "2nd"
+    series-title: "Springer Series in Statistics"
+    publisher: "Springer New York, NY"
+    issued:
+      year: 2009
+      month: 8
+      day: 26
+    ISBN:
+      - "978-0-387-84857-0"
+      - "978-0-387-84858-7"
+    DOI: "https://doi.org/10.1007/978-0-387-84858-7"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r libraries}
-library(caret)
-library(cluster)
-library(corrplot)
-library(dendextend)
-library(doParallel)
-library(dplyr)
-library(factoextra)
-library(ggplot2)
-library(gridExtra)
-library(patchwork)
-library(parallel)
-library(pROC)
-library(ranger)
-library(reshape2)
-library(rpart)
-library(rpart.plot)
-```
 
 ## Introduction
 
 The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset]. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
+
+
+## Importing libraries
+```{r libraries}
+suppressMessages(library(caret))
+suppressMessages(library(cluster))
+suppressMessages(library(corrplot))
+suppressMessages(library(dendextend))
+suppressMessages(library(doParallel))
+suppressMessages(library(dplyr))
+suppressMessages(library(factoextra))
+suppressMessages(library(ggplot2))
+suppressMessages(library(gridExtra))
+suppressMessages(library(patchwork))
+suppressMessages(library(parallel))
+suppressMessages(library(pROC))
+suppressMessages(library(ranger))
+suppressMessages(library(reshape2))
+suppressMessages(library(rpart))
+suppressMessages(library(rpart.plot))
+```
+
+
 
 ## Data exploration
 
@@ -644,23 +727,50 @@ head(cardio_data_scaled)
 
 
 
-## Classification Trees
+## Random Forest
 
-```{r classification trees (high cp)}
+### Classification trees
+
+In order to correctly fit the random forest model, let's analyze first some simpler classifiers: classification trees. 
+
+Firstly proposed by [@breiman1984classification], decision trees (or classification trees, when dealing with a discrete target variable) are unsupervised learning algorithms. The idea consists on recursively partition the feature space and assign a label to each resulting partition. The tree is then used to classify future points according to these splits and labels. The key advantage of decision trees over other methods is their high interpretability, a quality usually wanted when working in fields like healthcare [@bertsimas2017optimal].
+
+The dataset will be split in two parts: 80% for training the model and 20% for validation. 
+```{r classification trees (high cp) 1}
 # Split data (train/test)
 set.seed(123)
 cardio_cl$cardio <- as.factor(cardio_cl$cardio)
 train_index <- sample(1:nrow(cardio_cl), 0.8 * nrow(cardio_cl))  
 train_data <- cardio_cl[train_index, ]
 test_data <- cardio_cl[-train_index, ]
+```
 
+Now, it is time to fit the model. The function `rpart`, expects some user-defined parameters (the ones passed to the function below) but can also accept multiple optional parameters like `rpart.control`. This one controls some of the characteristic of the tree:
+
+- `minsplit`: Minimum observations to attempt a split.
+- `cp`: Complexity parameter for pruning.
+- `maxdepth`: Maximum depth of the tree
+- ...
+
+```{r classification trees (high cp) 2}
 # Build and plot the classification tree
 tree <- rpart(cardio ~ ., data = train_data, method = "class")
+tree$control
 rpart.plot(tree)
+```
 
+At first sight, we can observe that the classification tree completely relies on the feature `ap_hi` for the only split. Let's check the importance of the different features in the model:
+
+```{r classification trees (high cp) 3}
 # Check feature importance
 tree$variable.importance
+```
 
+It seem that `ap_hi`, together with `ap_lo`, out stand over the others features. Even though both of them are significant, they are highly correlated, so taking them into account at the same time would introduce redundancy in the tree.
+
+In order to better understand the performance of this model, we can check its accuracy and the area under the ROC curve after trying to classify the testing data.
+
+```{r classification trees (high cp) 4}
 # Make predictions
 predictions <- predict(tree, test_data, type = "prob")
 
@@ -683,23 +793,26 @@ plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 auc_value <- auc(roc_curve)
 print(paste("AUC:", round(auc_value, 4)))
 ```
-At first sight, we can observe that the classification tree completely relies on the feature `ap_hi` for the only split. After checking the importance of the difference features, this one, together with `ap_lo`, out stand over the others. Even though both of them are significant, they are highly correlated, so taking them into account at the same time would introduce redundancy in the tree.
 
-Let's check the control parameters in the building of the model:
-```{r}
-# Control parameters
-tree$control
-```
-Could we improve the performance of the model with more splits? In order to force the tree to use less relevant features, we will readjust some of this parameters. Specifically, we will reduce the complexity parameter (`cp`).
-```{r classification trees (low cp)}
+Could we improve the performance of the model with more splits? In order to force the tree to use less relevant features, we will readjust the complexity parameter (`cp`).
+
+```{r classification trees (low cp) 1}
 # New classification tree
 tree <- rpart(cardio ~ ., data = train_data, method = "class",
               control = rpart.control(cp = 0.001))
 rpart.plot(tree)
+```
 
+This time a much complex tree is created, taking into account all the features. All variables have now some importance in the model (even though the differences among them can be huge).
+
+```{r classification trees (low cp) 2}
 # Check feature importance
 tree$variable.importance
+```
 
+Let's check the performance:
+
+```{r classification trees (low cp) 3}
 # Make predictions
 predictions <- predict(tree, test_data, type = "prob")
 
@@ -723,37 +836,37 @@ auc_value <- auc(roc_curve)
 print(paste("AUC:", round(auc_value, 4)))
 ```
 
-After evaluating the model, we get a sightly better accuracy from a significantly more complex tree. Moreover, the area under the ROC curve also increases (from 0.7056 to 0.7770). From this comparison, we can conclude that although the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases, observing other variables like cholesterol, weight, age or glucose also helps to identify them.
+After evaluating both models, we get a sightly better accuracy from a significantly more complex tree. Moreover, the area under the ROC curve also increases (from 0.7056 to 0.7770). From this comparison, we can conclude that although the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases, observing other variables like cholesterol, weight, age or glucose also helps to identify them.
 
 
-## Random Forest
+### Random Forest model
 
-Following classification trees, a natural approximation is fitting a random forest model. Let's keep the default parameters:
+Following classification trees, a natural approximation is fitting a random forest model. 
 
-- `num.trees = 500`: the number of decision trees.
-- `mtry = sqrt(F)`: the number of features to use in each decision tree, where *F* is the total number of features.
+Introduced by [@breiman2001random], and explored by many other authors as [@hastie2009elements], Random Forest is an ensemble machine learning algorithm primarily used for classification and regression tasks. It operates by constructing a multitude of decision trees during training and outputs the mode of the classes (for classification) or the mean/average prediction (for regression) of the individual trees. It is a robust and versatile method that can handle non-linear relationships, large datasets, and high-dimensional data with ease.
+
+Since the trees that make up the model are completely independent and in order to speed up the training, the problem may be parallelized. Let's set it up:
 
 ```{r parellization}
-# Detect the number of cores available on your machine
+# Detect the number of cores available on your machine and register them
 cores <- parallel::detectCores()
-
-# Register the parallel backend with the desired number of cores (e.g., all cores)
 cl <- makeCluster(cores)  # Create a cluster with the detected cores
 registerDoParallel(cl)    # Register the parallel backend
 ```
 
+For this model, instead of splitting the data in two as we previously did, we will apply a k-fold-cross-validation technique. As this is going to be one of the final classifiers, correctly evaluating its performance and fully using the dataset for both training and validation is of vital importance. 
 
-```{r random forest (training)}
-# Factorize the variable if it is not a factor
-if (!is.factor(cardio_cl$cardio)) {
-  cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
-} else {
-  # Refactor the variable with the correct levels
-  if (!all(levels(cardio_cl$cardio) %in% c("No", "Yes"))) {
-    cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
-  }
-}
+Many parameters can be configured here. Some of them are:
 
+- `trControl(folds)`: The number of folds for the cross validation.
+- `tuneGrid(mtry)`: The number of features to use in each decision tree.
+- `tuneGrid(splitrule)`: Rule for splitting the tree
+- `tuneGrid(min.node.size)`: Minimum number of observations per leaf node.
+- ...
+
+After testing and analyzing all type of combination, the one which provided the best area under the ROC curve was the following one:
+
+```{r random forest (training) 1}
 # Cross-validation setup
 train_control <- trainControl(
   method = "cv",          
@@ -767,6 +880,20 @@ tune <- expand.grid(
     splitrule = c("gini"),
     min.node.size = c(1)
 )
+```
+
+Finally, let's compute the random forest using our settings.
+
+```{r random forest (training) 2}
+# Factorize the variable if it is not a factor
+if (!is.factor(cardio_cl$cardio)) {
+  cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
+} else {
+  # Refactor the variable with the correct levels
+  if (!all(levels(cardio_cl$cardio) %in% c("No", "Yes"))) {
+    cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
+  }
+}
 
 rf_model <- train(
   cardio ~ ., 
@@ -785,7 +912,11 @@ print(rf_model)
 ```
 
 
-```{r random forest (performance)}
+### Performance
+
+Regarding the performance of the final model:
+
+```{r random forest (performance) 3}
 # Get predicted probabilities
 predictions <- rf_model$finalModel$predictions
 predicted_probs <- predictions[, "Yes"] 
