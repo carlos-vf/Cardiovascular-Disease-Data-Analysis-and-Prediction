@@ -187,9 +187,6 @@ There are no NA values. However, from the summary we can see that there are vari
 ```{r}
 summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
 cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo | cardio$ap_hi-cardio$ap_lo > 250),]
-
-# save a copy of cardio with filtered values but without factor columns for clustering later on
-cardio_cl = cardio
 ```
 
 1274 observations have completely unrealistic values for either systolic or diastolic pressure (or both). In 274 of them, the systolic pressure is less than the diastolic, which is also not possible. These wrong metrics are less than 2% of the dataset, so the most straightforward approach is just to eliminate the problematic rows. \
@@ -238,6 +235,8 @@ ggplot(cardio, aes(y = age)) +
   ) +
   theme_minimal()   
 nrow(cardio[cardio$age<40,])
+# saving a copy of cardio with filtered values but without factor columns for clustering later on
+cardio_cl <- cardio
 ```
 
 There are only 4 observations concerning people < 40 years old, and the youngest one in the sample is 30: for this reason, we split between under (or equal to) and over 55.
