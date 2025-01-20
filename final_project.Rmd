@@ -150,7 +150,6 @@ suppressMessages(library(corrplot))
 suppressMessages(library(dendextend))
 suppressMessages(library(doParallel))
 suppressMessages(library(dplyr))
-suppressMessages(library(factoextra))
 suppressMessages(library(ggplot2))
 suppressMessages(library(gridExtra))
 suppressMessages(library(patchwork))
@@ -163,8 +162,6 @@ suppressMessages(library(rpart.plot))
 suppressMessages(library(GGally))
 suppressMessages(library(ggplot2))
 ```
-
-
 
 ## Data exploration
 
@@ -715,89 +712,6 @@ ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
 ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
 ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
 ```
-
-## Random Forest
-```{r}
-# Perform K-means clustering
-set.seed(123)  
-silhouette_scores = c()
-
-# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
-# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
- for (n_clusters in 2:10) {
-   # Perform k-means clustering
-   kmeans_result <- kmeans(sample_cardio_data_scaled, centers = n_clusters)
-
-   # Extract cluster labels from the k-means result
-   cluster_labels <- kmeans_result$cluster
-
-   # Calculate silhouette values
-   sil <- silhouette(cluster_labels, dist_matrix)
-
-   # Store the average silhouette score for the current number of clusters
-   silhouette_scores[n_clusters] <- mean(sil[, 3])
- }
-
-max_silhouette_kmeans = which.max(silhouette_scores)
-
-best_kmeans_result <- kmeans(cardio_data_scaled, centers = max_silhouette_kmeans)
-# Add the cluster assignment to the original data
-cardio$Cluster <- as.factor(best_kmeans_result$cluster)
-str(best_kmeans_result)
-```
-
-```{r}
-# Visualize the clusters across different dimensions
-cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (cardio vs ap_hi)")
-cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (cardio vs ap_lo)")
-
-grid.arrange(cl_p1, cl_p2)
-```
-Plotting along the cardio and both types of pressures, the clusters seem to neatly separate the data along some pressure values. 
-```{r}
-cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
-cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
-grid.arrange(cl_p3, cardio_pl)
-```
-Let's test for mean differences across clusters
-```{r}
-info_cluster1 = cardio %>% filter(Cluster == 1)
-summary(info_cluster1)
-```
-```{r}
-info_cluster2 = cardio %>% filter(Cluster == 2)
-summary(info_cluster2)
-```
-
-
-```{r}
-cluster_differences = c()
-for (i in continuous_vars){
-  wilcox_test_result <- wilcox.test(ap_hi ~ Cluster, data = cardio)
-  cluster_differences[i] = wilcox_test_result$p.value
-  print(wilcox_test_result$p.value)
-}
-
-for (i in categorical_vars){
-  # Create a contingency table
-  contingency_table <- table(cardio[[i]], cardio$Cluster)
-
-  # Perform the Chi-Square test
-  chi_square_result <- chisq.test(contingency_table)
-  cluster_differences[i] = chi_square_result$p.value
-  print(chi_square_result$p.value)
-}
-
-```
-
 
 ### Classification trees
 

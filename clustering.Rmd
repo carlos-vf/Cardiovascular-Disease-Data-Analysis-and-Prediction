@@ -20,62 +20,91 @@ summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|
 cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo | cardio$ap_hi-cardio$ap_lo > 250),]
 
 cardio_cl <- cardio
+# setup for better visualization
+cardio$gender <- factor(cardio$gender)
+levels(cardio$gender) = c("F", "M")
+#head(cardio$gender)
+
+cardio$cardio <- as.factor(cardio$cardio)
+#head(cardio$cardio)
+
+cardio$cholesterol <- factor(cardio$cholesterol)
+levels(cardio$cholesterol) = c("normal", "above normal", "well above normal")
+#head(cardio$cholesterol)
+
+cardio$gluc <- factor(cardio$gluc)
+levels(cardio$gluc) = c("normal", "above normal", "well above normal")
+#head(cardio$gluc)
+
+cardio$smoke <- factor(cardio$smoke)
+levels(cardio$smoke) = c("No", "Yes")
+#head(cardio$smoke)
+
+cardio$alco <- factor(cardio$alco)
+levels(cardio$alco) = c("No", "Yes")
+#head(cardio$alco)
+
+cardio$active <- factor(cardio$active)
+levels(cardio$active) = c("No", "Yes")
+#head(cardio$active)
+
+continuous_vars = c("ap_hi", "ap_lo", "weight", "height", "age")
 ```
 
 ## Clustering
 ### K-means clustering (old, scale everything-> 2 clusters)
 ```{r}
 # Scale the data to normalize the values
-cardio_data_scaled <- scale(cardio_cl[, -12])
+cardio_data_scaled1 <- scale(cardio_cl[, -12])
 
 # View the first few rows of the dataset
-head(cardio_data_scaled)
+head(cardio_data_scaled1)
 ```
 
 ```{r}
 # Compute the distance matrix for the scaled data
-sample_cardio_data_scaled = sample(cardio_data_scaled, 10000)
-dist_matrix <- dist(sample_cardio_data_scaled)
-head(dist_matrix)
+sample_cardio_data_scaled1 = sample(cardio_data_scaled1, 10000)
+dist_matrix1 <- dist(sample_cardio_data_scaled1)
+head(dist_matrix1)
 ```
 
 
 ```{r}
 # Perform K-means clustering
 set.seed(123)  
-silhouette_scores = c()
+silhouette_scores1 = c()
 
 # Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
 # Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
- for (n_clusters in 2:10) {
+for (n_clusters in 2:10) {
    # Perform k-means clustering
-   kmeans_result <- kmeans(sample_cardio_data_scaled, centers = n_clusters)
+   kmeans_result1 <- kmeans(sample_cardio_data_scaled1, centers = n_clusters)
 
    # Extract cluster labels from the k-means result
-   cluster_labels <- kmeans_result$cluster
+   cluster_labels1 <- kmeans_result1$cluster
 
    # Calculate silhouette values
-   sil <- silhouette(cluster_labels, dist_matrix)
+   sil1 <- silhouette(cluster_labels1, dist_matrix1)
 
    # Store the average silhouette score for the current number of clusters
-   silhouette_scores[n_clusters] <- mean(sil[, 3])
+   silhouette_scores1[n_clusters] <- mean(sil1[, 3])
  }
 
-max_silhouette_kmeans = which.max(silhouette_scores)
+max_silhouette_kmeans1 = which.max(silhouette_scores1)
 
-best_kmeans_result <- kmeans(cardio_data_scaled, centers = max_silhouette_kmeans)
+best_kmeans_result1 <- kmeans(cardio_data_scaled1, centers = max_silhouette_kmeans1)
 
 # Add the cluster assignment to the original data
-cardio$Cluster <- as.factor(best_kmeans_result$cluster)
-str(best_kmeans_result)
+cardio$Cluster1 <- as.factor(best_kmeans_result1$cluster)
+table(cardio$Cluster1)
 ```
 
 ```{r}
 # Visualize the clusters across different dimensions
-cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster1)) +
   geom_point() +
   labs(title = "K-Means Clustering (cardio vs ap_hi)")
-cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster1)) +
   geom_point() +
   labs(title = "K-Means Clustering (cardio vs ap_lo)")
 
@@ -83,7 +112,7 @@ grid.arrange(cl_p1, cl_p2)
 ```
 Plotting along the cardio and both types of pressures, the clusters seem to neatly separate the data along some pressure values. 
 ```{r}
-cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster1)) +
   geom_point() +
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 
@@ -96,67 +125,74 @@ Plotting `ap_hi` against `ap_lo`, the division is even more evident: and it some
 
 Let's test for mean differences across clusters
 ```{r}
-info_cluster1 = cardio %>% filter(Cluster == 1)
+info_cluster1 = cardio %>% filter(Cluster1 == 1)
 summary(info_cluster1)
 ```
 ```{r}
-info_cluster2 = cardio %>% filter(Cluster == 2)
+info_cluster2 = cardio %>% filter(Cluster1 == 2)
 summary(info_cluster2)
 ```
 It seems there are way more individuals with higher values of `cholesterol` and `gluc` in the second cluster. Furthermore, here seniors are the majority, while the first one consists mostly of elderly individuals.
+
 ```{r}
-cluster_differences = c()
+cluster_differences1 = c()
+categorical_vars <- names(cardio)[!names(cardio) %in% c("cardio", continuous_vars)]
+```
+
+Just as before, we use different statistical tests to explore whether there are significant differences between the clusters. 
+!!! TO DISCUSS: does it make sense to do such tests? With clustering, I run an algorithm that is specifically designed to group the data in some way. I then test the groups formed by this algorithm to see if they are independent based on the categorical variables. OFC they will not be! Clusters were found BASED on those variables, so perhaps it's a useless comparison. 
+```{r}
+
 for (i in continuous_vars){
-  wilcox_test_result <- wilcox.test(ap_hi ~ Cluster, data = cardio)
-  cluster_differences[i] = wilcox_test_result$p.value
-  print(wilcox_test_result$p.value)
+  anova <- aov(cardio[, i] ~ cardio[, "Cluster1"])
+  cluster_differences1[i] = summary(anova)[[1]][["Pr(>F)"]][1]
 }
+
 
 for (i in categorical_vars){
   # Create a contingency table
-  contingency_table <- table(cardio[[i]], cardio$Cluster)
+  contingency_table <- table(cardio[[i]], cardio$Cluster1)
 
   # Perform the Chi-Square test
   chi_square_result <- chisq.test(contingency_table)
-  cluster_differences[i] = chi_square_result$p.value
-  print(chi_square_result$p.value)
-}
+  cluster_differences1[i] = chi_square_result$p.value
+}<
 
+table(cardio$cardio, cardio$Cluster1)
+
+cardio[, cardio$Cluster1 == 1]
 ```
-The clusters are very different across all metrics, not only those we supposed.
+The clusters seem to be very different across all metrics, not only those we supposed.
 Summarizing our result, there seems to be a "healthier" group (cluster 1), where there are less people with high values of `cholesterol` and `gluc`, less drinkers, more active people, more elderly individuals and, finally, more females. 
 Roughly 75% of cluster 1 doesn't have heart diseases, while 87 % of cluster 2 does.
 
-
-
-### K-means clustering (scale only numerical ->)
+### K-means clustering (scale only numerical -> 8 clusters)
 ```{r}
 # Filter the dataset to exclude these columns and scale the remaining numeric columns
-cardio_cl[, c(continuous_vars, "cardio")] <- scale(cardio_cl[, c(continuous_vars, "cardio")])
-cardio_data_scaled <- cardio_cl
+cardio_scaled_onlynums = cardio_cl
+cardio_scaled_onlynums[, c(continuous_vars)] = scale(cardio_scaled_onlynums[, c(continuous_vars)])
 
 # View the first few rows of the dataset
-head(cardio_data_scaled)
+head(cardio_scaled_onlynums)
 ```
 
 ```{r}
 # Compute the distance matrix for the scaled data
-sample_cardio_data_scaled = sample(as.matrix(cardio_data_scaled), 10000)
-dist_matrix <- dist(sample_cardio_data_scaled)
-head(dist_matrix)
+sample_cardio_onlynums = sample(as.matrix(cardio_scaled_onlynums), 10000)
+dist_matrix <- dist(sample_cardio_onlynums)
 ```
 
 
 ```{r}
 # Perform K-means clustering
 set.seed(123)  
-silhouette_scores = c()
+silhouette_scores_onlynum = c()
 
 # Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
 # Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
  for (n_clusters in 2:10) {
    # Perform k-means clustering
-   kmeans_result <- kmeans(sample_cardio_data_scaled, centers = n_clusters)
+   kmeans_result <- kmeans(sample_cardio_onlynums, centers = n_clusters)
 
    # Extract cluster labels from the k-means result
    cluster_labels <- kmeans_result$cluster
@@ -165,31 +201,31 @@ silhouette_scores = c()
    sil <- silhouette(cluster_labels, dist_matrix)
 
    # Store the average silhouette score for the current number of clusters
-   silhouette_scores[n_clusters] <- mean(sil[, 3])
+   silhouette_scores_onlynum[n_clusters] <- mean(sil[, 3])
  }
 
-max_silhouette_kmeans = which.max(silhouette_scores)
+max_silhouette_kmeans_onlynum = which.max(silhouette_scores_onlynum)
 
-best_kmeans_result <- kmeans(cardio_data_scaled, centers = max_silhouette_kmeans)
+best_kmeans_result_onlynum <- kmeans(cardio_cl, centers = max_silhouette_kmeans_onlynum)
 # Add the cluster assignment to the original data
-cardio$Cluster <- as.factor(best_kmeans_result$cluster)
-str(best_kmeans_result)
+cardio$Cluster_ON <- as.factor(best_kmeans_result_onlynum$cluster)
+table(cardio$Cluster_ON)
 ```
 
 ```{r}
 # Visualize the clusters across different dimensions
-cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster_ON)) +
   geom_point() +
   labs(title = "K-Means Clustering (cardio vs ap_hi)")
-cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster_ON)) +
   geom_point() +
   labs(title = "K-Means Clustering (cardio vs ap_lo)")
 
 grid.arrange(cl_p1, cl_p2)
 ```
-Plotting along the cardio and both types of pressures, the clusters seem to neatly separate the data along some pressure values. 
+
 ```{r}
-cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster_ON)) +
   geom_point() +
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
@@ -197,23 +233,14 @@ cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 grid.arrange(cl_p3, cardio_pl)
 ```
-Plotting `ap_hi` against `ap_lo`, the division is even more evident: and it somehow resembles the boundaries described by the `cardio` variable itself.
+A main split persists, but there more clusters in the "border zone" in the middle.
 
 Let's test for mean differences across clusters
 ```{r}
-info_cluster1 = cardio %>% filter(Cluster == 1)
-summary(info_cluster1)
-```
-```{r}
-info_cluster2 = cardio %>% filter(Cluster == 2)
-summary(info_cluster2)
-```
-It seems there are way more individuals with higher values of `cholesterol` and `gluc` in the second cluster. Furthermore, here seniors are the majority, while the first one consists mostly of elderly individuals.
-```{r}
 cluster_differences = c()
 for (i in continuous_vars){
-  wilcox_test_result <- wilcox.test(ap_hi ~ Cluster, data = cardio)
-  cluster_differences[i] = wilcox_test_result$p.value
+  anova <- aov(cardio[, i] ~ cardio[, "Cluster"])
+  cluster_differences[i] = summary(anova)[[1]][["Pr(>F)"]][1]
   print(wilcox_test_result$p.value)
 }
 
@@ -227,29 +254,94 @@ for (i in categorical_vars){
   print(chi_square_result$p.value)
 }
 
+cluster_differences
 ```
-The clusters are very different across all metrics, not only those we supposed.
-Summarizing our result, there seems to be a "healthier" group (cluster 1), where there are less people with high values of `cholesterol` and `gluc`, less drinkers, more active people, more elderly individuals and, finally, more females. 
-Roughly 75% of cluster 1 doesn't have heart diseases, while 87 % of cluster 2 does.
 
-
-
-
-### K-means clustering (only numerical)
+### K-means clustering (only numerical -> 8 clusters)
 ```{r}
-cardio_data_scaled <- scale(cardio_cl[, continuous_vars])
+cardio_justnum <- scale(cardio_cl[, continuous_vars])
 
 # View the first few rows of the dataset
-head(cardio_data_scaled)
+head(cardio_justnum)
 ```
 
 ```{r}
 # Compute the distance matrix for the scaled data
-sample_cardio_data_scaled = sample(cardio_data_scaled, 10000)
-dist_matrix <- dist(sample_cardio_data_scaled)
-head(dist_matrix)
+sample_justnum = sample(cardio_justnum, 10000)
+dist_matrix_justnum <- dist(sample_justnum)
+head(dist_matrix_justnum)
 ```
 
+```{r}
+# Perform K-means clustering
+set.seed(123)  
+silhouette_scores_justnum = c()
+
+# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
+# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
+ for (n_clusters in 2:10) {
+   # Perform k-means clustering
+   kmeans_result <- kmeans(sample_justnum, centers = n_clusters)
+
+   # Extract cluster labels from the k-means result
+   cluster_labels <- kmeans_result$cluster
+
+   # Calculate silhouette values
+   sil <- silhouette(cluster_labels, dist_matrix)
+
+   # Store the average silhouette score for the current number of clusters
+   silhouette_scores_justnum[n_clusters] <- mean(sil[, 3])
+ }
+
+max_silhouette_kmeans_justnum = which.max(silhouette_scores_justnum)
+
+best_kmeans_result_justnum <- kmeans(cardio_justnum, centers = max_silhouette_kmeans_justnum)
+# Add the cluster assignment to the original data
+cardio$Cluster <- as.factor(best_kmeans_result_justnum$cluster)
+table(cardio$Cluster)
+```
+
+```{r}
+# Visualize the clusters across different dimensions
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+
+grid.arrange(cl_p1, cl_p2)
+```
+
+```{r}
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+grid.arrange(cl_p3, cardio_pl)
+```
+```{r}
+cluster_differences = c()
+for (i in continuous_vars){
+  anova <- aov(cardio[, i] ~ cardio[, "Cluster"])
+  cluster_differences[i] = summary(anova)[[1]][["Pr(>F)"]][1]
+  print(wilcox_test_result$p.value)
+}
+
+for (i in categorical_vars){
+  # Create a contingency table
+  contingency_table <- table(cardio[[i]], cardio$Cluster)
+
+  # Perform the Chi-Square test
+  chi_square_result <- chisq.test(contingency_table)
+  cluster_differences[i] = chi_square_result$p.value
+  print(chi_square_result$p.value)
+}
+
+cluster_differences
+```
 ### K-modes clustering (only categorical -> 8 clusters)
 ```{r}
 library(klaR)
@@ -288,12 +380,12 @@ dist_matrix_modes = daisy(sample_cardio_data_modes, metric = "gower")
 
 min_cost_kmodes = which.min(modes_cost)
 
-best_kmodes_result <- kmodes(cardio_data_modes, modes = max_silhouette_kmodes)
+best_kmodes_result <- kmodes(cardio_data_modes, modes = min_cost_kmodes)
 # Add the cluster assignment to the original data
 cardio$Cluster_modes <- as.factor(best_kmodes_result$cluster)
-str(best_kmodes_result)
-# fviz_cluster(best_kmeans_result, data = cardio_data_scaled)
+table(cardio$Cluster_modes)
 ```
+
 ```{r}
 # Visualize the clusters across different dimensions
 modes_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster_modes)) +
@@ -305,14 +397,51 @@ modes_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster_modes)) +
 
 grid.arrange(modes_p1, modes_p2)
 ```
+
 ```{r}
 modes_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
   geom_point() +
-  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+  labs(title = "K-Modes Clustering (ap_hi vs ap_lo)")
 cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
   geom_point() +
-  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+  labs(title = "K-Modes Clustering (ap_hi vs ap_lo)")
 grid.arrange(modes_p3, cardio_pl)
 ```
 
+```{r}
+modes_cluster_differences = c()
+for (i in continuous_vars){
+  anova <- aov(cardio[, i] ~ cardio[, "Cluster"])
+  modes_cluster_differences[i] = summary(anova)[[1]][["Pr(>F)"]][1]
+}
+
+for (i in categorical_vars){
+  # Create a contingency table
+  contingency_table <- table(cardio[[i]], cardio$Cluster)
+
+  # Perform the Chi-Square test
+  chi_square_result <- chisq.test(contingency_table)
+  modes_cluster_differences[i] = chi_square_result$p.value
+  print(chi_square_result$p.value)
+}
+
+modes_cluster_differences
+```
+
+
+# Further attempt at hierarchical clustering
+```{r}
+dist_matrix_hc = daisy(as.matrix(sample_cardio_onlynums), metric = "gower")
+
+hierarchical = hclust(dist_matrix_hc, method = "centroid")
+dev.off()  # Close any active graphics devices
+cutree(hierarchical, k = 5)  # Replace k with the intended number of clusters
+plot(hierarchical, hang = -1)  # Better leaf alignment
+rect.hclust(hierarchical, k = 5, border = "red")  # Highlight 5 clusters
+
+library(dendextend)
+dend <- as.dendrogram(hierarchical)
+plot(dend)
+rect.dendrogram(dend, k = 5, border = "red")
+```
 
