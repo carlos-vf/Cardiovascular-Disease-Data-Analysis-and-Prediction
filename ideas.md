@@ -8,3 +8,5 @@
 	- Coefficients in Logistic regression and their significance
 	- Variable importance and impurity in random forests
 - Use Pulse Pressure variable (difference between systolic and diastolic)
+
+- save all images and plot grids to folder to use them in presentation. 
