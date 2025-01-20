@@ -465,7 +465,7 @@ ggsave("images/alcohol_gender.png", ag, width = 8, height = 8)
 ggsave("images/agecat.png", acat, width = 8, height = 8)
 ```
 
-As expected, cardiovascular diseases are more common in the older age group.\
+Within people having heart disease, high colesterol, glucose and older age people are significantly overrepresented, and to a smaller extent are inactive people. Surprisingly, the percantage of smokers and alcohol consumers is slightly higher for the healthy group, whereas gender doesn't seem to have significant differences.\
 We use the Chi-squared test to see to which degree the variables are correlated with cardio:
 
 ```{r}
@@ -554,44 +554,24 @@ p6 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = gluc))
 
 
 ```{r}
-grid.arrange(p1, p2, p3, p4)
+grid.arrange(p1, p2, ncol=2)
+grid.arrange(p3, p4, ncol=2)
+grid.arrange(p5,p6, ncol=2)
 ```
 
-```{r}
-grid.arrange(p5,p6)
-```
-
-```{r}
-p8 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = cholesterol))
-p9 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = age_cat))
-p10 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = smoke))
-p11 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = active))
-p12 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = alco))
-p13 <- ggplot(cardio, aes(cardio, ap_lo)) + geom_point(aes(color = gluc))
-
-grid.arrange(p8, p9, p10, p11)
-```
-
-```{r}
-grid.arrange(p12, p13)
-```
 
 ```{r SAVE SCATTERPLOTS}
 first4cat = arrangeGrob(p1, p2, p3, p4, ncol=2)
 second2cat = arrangeGrob(p5, p6, ncol=2)
-last4cat = arrangeGrob(p8, p9, p10, p11, ncol=2)
-last2cat = arrangeGrob(p12, p13, ncol=2)
 
 ggsave("images/APHI_chol_age_smoke_active.png", first4cat, width = 8, height = 8)
 ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
-ggsave("images/APLO_chol_age_smoke_active.png", last4cat, width = 8, height = 8)
-ggsave("images/APLOalco_gluc.png", last2cat, width = 8, height = 8)
 
 ```
 
-While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.
+#While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.
 
-```{r barplots}
+```{r barplots2}
 #Cholesterol
 cholesterol_data <- aggregate(
   x = list(count = rep(1, nrow(cardio))), 
