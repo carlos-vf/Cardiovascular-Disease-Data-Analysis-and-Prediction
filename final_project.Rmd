@@ -896,5 +896,101 @@ plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 
 As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
+## Logistic Regression Model
+
+log_model <- glm(cardio ~ ., data = train_data, family = binomial)
+
+## Model Predictions
+
+log_pred <- predict(log_model, newdata = test_data, type = 'response')
+log_pred_class <- factor(ifelse(log_pred > 0.5, "Disease", "No Disease"))
+
+
+# Model Evaluation
+
+## Confusion Matrix for Logistic Regression
+
+conf_matrix <- confusionMatrix(log_pred_class, test_data$cardio)
+print(conf_matrix)
+
+## Confusion Matrix Visualization
+
+confusion_df <- as.data.frame(conf_matrix$table)
+ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
+  geom_tile() +
+  geom_text(aes(label=Freq), color="white", size=5) +
+  scale_fill_gradient(low="blue", high="red") +
+  labs(title="Confusion Matrix: Logistic Regression", x="Actual", y="Predicted") +
+  theme_minimal()
+
+## Performance Metrics Calculation
+
+# Extract confusion matrix values
+TN <- conf_matrix$table[1,1]
+FP <- conf_matrix$table[1,2]
+FN <- conf_matrix$table[2,1]
+TP <- conf_matrix$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+
+# Print computed metrics
+print(metrics_df)
+
+# Visualisation of metrics
+
+ggplot(metrics_df, aes(x=Metric, y=Value, fill=Metric)) +
+  geom_bar(stat='identity') +
+  geom_text(aes(label=round(Value, 3)), vjust=-0.5, size=5) +
+  labs(title="Performance Metrics of Logistic Regression", x="Metric", y="Value") +
+  theme_minimal()
+
+
+
+## ROC Curve for Logistic Regression
+
+roc_curve <- roc(test_data$cardio, log_pred)
+plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
+print(auc(roc_curve))
+
+# Feature Importance
+
+importance_lr <- as.data.frame(summary(log_model)$coefficients)
+importance_lr$Feature <- rownames(importance_lr)
+
+# Remove intercept for better visualization
+importance_lr <- importance_lr[importance_lr$Feature != "(Intercept)", ]
+
+# Rename columns for clarity
+colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Feature")
+
+# Plot feature importance
+ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
+  geom_bar(stat='identity', fill='steelblue') +
+  coord_flip() +
+  labs(title="Feature Importance - Logistic Regression",
+       x="Feature", y="Importance (Coefficient Absolute Value)") +
+  theme_minimal()
+
+
+# Visualizations
+
+ggsave("confusion_matrix_logistic.png", width=8, height=6)
+ggsave("roc_curve_logistic.png", width=8, height=6)
+ggsave("feature_importance_logistic.png", width=8, height=6)
+
+
 
 ## References
