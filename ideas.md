@@ -1,5 +1,6 @@
 - Try k-modes clustering/ fix clustering for categorical variables
 - add logistic regression:
+    - LASSO or RIDGE?
 	- try polynomial regression (age)
 	- try interaction terms (cholesterol, active)
 	- compare models with AIC/BIC
