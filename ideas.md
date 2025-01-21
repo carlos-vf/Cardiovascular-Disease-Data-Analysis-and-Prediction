@@ -11,3 +11,4 @@
 - Use Pulse Pressure variable (difference between systolic and diastolic)
 
 - save all images and plot grids to folder to use them in presentation. 
+- Analysis of risk factors, e.g: usually age increases blood pressure because of arteries becoming less elastic (possibly similar to analyzing the interaction terms).
