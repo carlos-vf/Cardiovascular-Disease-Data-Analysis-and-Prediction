@@ -264,6 +264,11 @@ table(cardio$cardio)
 
 The dataset is balanced with respect to the target variable.\
 
+```{r}
+cardio$age_cat <- factor(cardio$age_cat)
+levels(cardio$age_cat) = c("Under 55", "Over 55")
+
+```
 Numerical and categorical variables are specified for convenience:
 
 ```{r eval=TRUE, include=TRUE}
@@ -281,7 +286,37 @@ for (i in 1:num_vars) {
 
 ```
 
-We now proceed to plot the distribution of the numerical variables, with respect to the disease status:
+We now proceed to plot the distribution of the numerical variables, also with respect to the disease status:
+
+```{r}
+set.seed(123)
+custom_colors <- c("royalblue", "lightcoral")
+
+plot.new()
+pairs(
+  numerical,
+  labels = colnames(numerical),
+  pch = 'o',
+  bg = custom_colors[sampled_cardio + 1],
+  col = custom_colors[sampled_cardio + 1],
+  main = "\n",
+  row1attop = TRUE,
+  gap = 1,
+  cex.labels = 1,
+  cex = 0.8
+)
+legend(
+  "topleft",
+  legend = c("No disease", "Disease"),
+  col = custom_colors,
+  pch = 'o',
+  pt.bg = custom_colors,
+  bty = "n",
+  xpd = TRUE,  # Allow drawing outside the plot area
+  inset = c(0.8, -0.17)
+)
+
+```
 
 ```{r}
 
