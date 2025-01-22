@@ -126,8 +126,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset]. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]
-## Install packages
+The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset]. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]## Install packages
 ```{r, eval=FALSE}
 packages <- c("caret", "cluster", "corrplot", "dendextend", "doParallel", "dplyr", 
               "factoextra", "ggplot2", "gridExtra", "patchwork", "parallel", 
@@ -150,6 +149,7 @@ suppressMessages(library(corrplot))
 suppressMessages(library(dendextend))
 suppressMessages(library(doParallel))
 suppressMessages(library(dplyr))
+suppressMessages(library(GGally))
 suppressMessages(library(ggplot2))
 suppressMessages(library(gridExtra))
 suppressMessages(library(patchwork))
@@ -159,8 +159,6 @@ suppressMessages(library(ranger))
 suppressMessages(library(reshape2))
 suppressMessages(library(rpart))
 suppressMessages(library(rpart.plot))
-suppressMessages(library(GGally))
-suppressMessages(library(ggplot2))
 ```
 
 ## Data exploration
@@ -288,7 +286,7 @@ for (i in 1:num_vars) {
 
 We now proceed to plot the distribution of the numerical variables, also with respect to the disease status:
 
-```{r pairs}
+```{r pairs, , eval=FALSE}
 set.seed(123)
 custom_colors <- c("royalblue", "lightcoral")
 
@@ -973,9 +971,8 @@ plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
 print(auc(roc_curve))
 ```
 
-```{r DOES THIS MAKE SENSE?}
+```{r lr-feature-importance}
 # Feature Importance
-
 importance_lr <- as.data.frame(summary(log_model)$coefficients)
 importance_lr$Feature <- rownames(importance_lr)
 
