@@ -290,6 +290,10 @@ We now proceed to plot the distribution of the numerical variables, also with re
 
 ```{r}
 set.seed(123)
+sample_indices <- sample(1:nrow(numerical), size = 1 * nrow(numerical))
+sampled_numerical <- numerical[sample_indices, ]
+sampled_cardio <- as.numeric(as.character(cardio$cardio[sample_indices]))
+
 custom_colors <- c("royalblue", "lightcoral")
 
 plot.new()
@@ -297,8 +301,8 @@ pairs(
   numerical,
   labels = colnames(numerical),
   pch = 'o',
-  bg = custom_colors[sampled_cardio + 1],
-  col = custom_colors[sampled_cardio + 1],
+  bg = custom_colors[cardio + 1],
+  col = custom_colors[cardio + 1],
   main = "\n",
   row1attop = TRUE,
   gap = 1,
@@ -315,7 +319,6 @@ legend(
   xpd = TRUE,  # Allow drawing outside the plot area
   inset = c(0.8, -0.17)
 )
-
 ```
 
 ```{r}
@@ -913,6 +916,7 @@ summary(log_model)
 There are several seemingly weird effects in this model:
 - a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
 ```{r}
+
 ## Model Predictions
 log_pred <- predict(log_model, newdata = test_data, type = 'response')
 log_pred_class <- factor(ifelse(log_pred > 0.5, "1", "0"))
@@ -963,6 +967,7 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 ```{r}
+
 ## ROC Curve for Logistic Regression
 roc_curve <- roc(test_data$cardio, log_pred)
 plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
@@ -997,9 +1002,6 @@ ggsave("confusion_matrix_logistic.png", width=8, height=6)
 ggsave("roc_curve_logistic.png", width=8, height=6)
 ggsave("feature_importance_logistic.png", width=8, height=6)
 
-## References
-```
-
 Let's now further investigate the relationship between some of the variables and heart disease
 ### Smoke
 ```{r}
@@ -1011,3 +1013,4 @@ In the data exploration part, we saw that there were, numerically, minimal diffe
 Furthermore both of these variables are *subjective*, meaning that the answer was at the respondant's discretion. This means one could straight up lie, or even, having quit recently, answer `no` even though the effects of alcohol consumption or smoking were already present. 
 
 ### Glucose
+
