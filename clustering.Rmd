@@ -121,6 +121,9 @@ cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 grid.arrange(cl_p3, cardio_pl)
 ```
+```{r}
+ggsave("images/2kmodes_all_good.png", width=8, height=6)
+```
 Plotting `ap_hi` against `ap_lo`, the division is even more evident: and it somehow resembles the boundaries described by the `cardio` variable itself.
 
 Let's test for mean differences across clusters
@@ -257,7 +260,7 @@ for (i in categorical_vars){
 cluster_differences
 ```
 
-### K-means clustering (only numerical -> 8 clusters)
+### K-means clustering (only numerical -> 2 clusters)
 ```{r}
 cardio_justnum <- scale(cardio_cl[, continuous_vars])
 
@@ -322,6 +325,10 @@ cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 grid.arrange(cl_p3, cardio_pl)
 ```
+```{r}
+ggsave("images/2kmodes_justnum_good.png", width=8, height=6)
+```
+
 ```{r}
 cluster_differences = c()
 for (i in continuous_vars){
@@ -399,7 +406,7 @@ grid.arrange(modes_p1, modes_p2)
 ```
 
 ```{r}
-modes_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+modes_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster_modes)) +
   geom_point() +
   labs(title = "K-Modes Clustering (ap_hi vs ap_lo)")
 cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
