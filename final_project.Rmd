@@ -263,27 +263,6 @@ table(cardio$cardio)
 ```
 
 The dataset is balanced with respect to the target variable.\
-Dividing age by 365 to obtain it in years:
-
-```{r}
-cardio$age = ceiling(cardio$age/365)
-summary(cardio$age)
-ggplot(cardio, aes(y = age)) +
-  geom_boxplot(fill = "skyblue", color = "black") + labs(
-    y = "Age"                                       
-  ) +
-  theme_minimal()   
-nrow(cardio[cardio$age<40,])
-# saving a copy of cardio with filtered values but without factor columns for clustering later on
-cardio_cl <- cardio
-```
-
-There are only 4 observations concerning people < 40 years old, and the youngest one in the sample is 30: for this reason, we split between under (or equal to) and over 55.
-
-```{r age_categorizing}
-cardio$age_cat <- ifelse(cardio$age <= 55, '30-55', '55-65')
-table(cardio$age_cat)
-```
 
 ```{r}
 cardio$age_cat <- factor(cardio$age_cat)
