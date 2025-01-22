@@ -614,7 +614,9 @@ set.seed(42)
 trainIndex &lt;- createDataPartition(data$cardio, p = 0.8, list = FALSE)
 train_data &lt;- data[trainIndex, ]
 test_data &lt;- data[-trainIndex, ]
-
+  
+<pre class="r"><code># Model Training
+  
 ## Logistic Regression Model
 
 log_model &lt;- glm(cardio ~ ., data = train_data, family = binomial)
