@@ -263,33 +263,7 @@ table(cardio$cardio)
 ```
 
 The dataset is balanced with respect to the target variable.\
-Dividing age by 365 to obtain it in years:
 
-```{r}
-cardio$age = ceiling(cardio$age/365)
-summary(cardio$age)
-ggplot(cardio, aes(y = age)) +
-  geom_boxplot(fill = "skyblue", color = "black") + labs(
-    y = "Age"                                       
-  ) +
-  theme_minimal()   
-nrow(cardio[cardio$age<40,])
-# saving a copy of cardio with filtered values but without factor columns for clustering later on
-cardio_cl <- cardio
-```
-
-There are only 4 observations concerning people < 40 years old, and the youngest one in the sample is 30: for this reason, we split between under (or equal to) and over 55.
-
-```{r age_categorizing}
-cardio$age_cat <- ifelse(cardio$age <= 55, '30-55', '55-65')
-table(cardio$age_cat)
-```
-
-```{r}
-cardio$age_cat <- factor(cardio$age_cat)
-levels(cardio$age_cat) = c("Under 55", "Over 55")
-
-```
 Numerical and categorical variables are specified for convenience:
 
 ```{r eval=TRUE, include=TRUE}
@@ -569,7 +543,7 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 ```
 
-#While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.
+**While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.**
 
 ```{r barplots2}
 #Cholesterol
@@ -703,10 +677,10 @@ The dataset will be split in two parts: 80% for training the model and 20% for v
 ```{r classification trees (high cp) 1}
 # Split data (train/test)
 set.seed(123)
-cardio_cl$cardio <- as.factor(cardio_cl$cardio)
-train_index <- sample(1:nrow(cardio_cl), 0.8 * nrow(cardio_cl))  
-train_data <- cardio_cl[train_index, ]
-test_data <- cardio_cl[-train_index, ]
+cardio$age_cat <- NULL
+train_index <- sample(1:nrow(cardio), 0.8 * nrow(cardio))  
+train_data <- cardio[train_index, ]
+test_data <- cardio[-train_index, ]
 ```
 
 Now, it is time to fit the model. The function `rpart`, expects some user-defined parameters (the ones passed to the function below) but can also accept multiple optional parameters like `rpart.control`. This one controls some of the characteristic of the tree:
@@ -897,14 +871,16 @@ plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
 ## Logistic Regression Model
-
-log_model <- glm(cardio ~ ., data = train_data, family = binomial)
-
+```{r}
+log_model <- glm(cardio ~ ., data = train_data, family = binomial(link = "logit"))
+summary(log_model)
+```
+There are several seemingly weird effects in this model:
+- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
+```{r}
 ## Model Predictions
-
 log_pred <- predict(log_model, newdata = test_data, type = 'response')
-log_pred_class <- factor(ifelse(log_pred > 0.5, "Disease", "No Disease"))
-
+log_pred_class <- factor(ifelse(log_pred > 0.5, "1", "0"))
 
 # Model Evaluation
 
@@ -922,7 +898,9 @@ ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
   scale_fill_gradient(low="blue", high="red") +
   labs(title="Confusion Matrix: Logistic Regression", x="Actual", y="Predicted") +
   theme_minimal()
+```
 
+```{r}
 ## Performance Metrics Calculation
 
 # Extract confusion matrix values
@@ -948,23 +926,16 @@ metrics_df <- data.frame(
 
 # Print computed metrics
 print(metrics_df)
-
-# Visualisation of metrics
-
-ggplot(metrics_df, aes(x=Metric, y=Value, fill=Metric)) +
-  geom_bar(stat='identity') +
-  geom_text(aes(label=round(Value, 3)), vjust=-0.5, size=5) +
-  labs(title="Performance Metrics of Logistic Regression", x="Metric", y="Value") +
-  theme_minimal()
-
-
-
+```
+```{r}
 ## ROC Curve for Logistic Regression
-
 roc_curve <- roc(test_data$cardio, log_pred)
 plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
+```
+```{r}
 print(auc(roc_curve))
-
+```
+```{r DOES THIS MAKE SENSE?}
 # Feature Importance
 
 importance_lr <- as.data.frame(summary(log_model)$coefficients)
@@ -985,12 +956,23 @@ ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
   theme_minimal()
 
 
-# Visualizations
+  # Visualizations
 
 ggsave("confusion_matrix_logistic.png", width=8, height=6)
 ggsave("roc_curve_logistic.png", width=8, height=6)
 ggsave("feature_importance_logistic.png", width=8, height=6)
 
-
-
 ## References
+```
+
+Let's now further investigate the relationship between some of the variables and heart disease
+### Smoke
+```{r}
+smoke_check = glm(cardio ~ smoke + alco, data = train_data, family = binomial(link = "logit") )
+summary(smoke_check)
+```
+Even if taken as the single predictor, it still counterintuitively contributes negatively to `cardio`. However the significance is lower than that in the complete model.
+In the data exploration part, we saw that there were, numerically, minimal differences between groups with regard do this variable. 
+Furthermore both of these variables are *subjective*, meaning that the answer was at the respondant's discretion. This means one could straight up lie, or even, having quit recently, answer `no` even though the effects of alcohol consumption or smoking were already present. 
+
+### Glucose
