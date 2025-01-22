@@ -288,12 +288,8 @@ for (i in 1:num_vars) {
 
 We now proceed to plot the distribution of the numerical variables, also with respect to the disease status:
 
-```{r}
+```{r pairs}
 set.seed(123)
-sample_indices <- sample(1:nrow(numerical), size = 1 * nrow(numerical))
-sampled_numerical <- numerical[sample_indices, ]
-sampled_cardio <- as.numeric(as.character(cardio$cardio[sample_indices]))
-
 custom_colors <- c("royalblue", "lightcoral")
 
 plot.new()
@@ -301,8 +297,8 @@ pairs(
   numerical,
   labels = colnames(numerical),
   pch = 'o',
-  bg = custom_colors[cardio + 1],
-  col = custom_colors[cardio + 1],
+  bg = custom_colors[as.numeric(as.character(cardio$cardio)) + 1],
+  col = custom_colors[as.numeric(as.character(cardio$cardio)) + 1],
   main = "\n",
   row1attop = TRUE,
   gap = 1,
@@ -916,7 +912,6 @@ summary(log_model)
 There are several seemingly weird effects in this model:
 - a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
 ```{r}
-
 ## Model Predictions
 log_pred <- predict(log_model, newdata = test_data, type = 'response')
 log_pred_class <- factor(ifelse(log_pred > 0.5, "1", "0"))
@@ -966,15 +961,18 @@ metrics_df <- data.frame(
 # Print computed metrics
 print(metrics_df)
 ```
+
 ```{r}
 
 ## ROC Curve for Logistic Regression
 roc_curve <- roc(test_data$cardio, log_pred)
 plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
 ```
+
 ```{r}
 print(auc(roc_curve))
 ```
+
 ```{r DOES THIS MAKE SENSE?}
 # Feature Importance
 
@@ -1001,8 +999,10 @@ ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
 ggsave("confusion_matrix_logistic.png", width=8, height=6)
 ggsave("roc_curve_logistic.png", width=8, height=6)
 ggsave("feature_importance_logistic.png", width=8, height=6)
+```
 
 Let's now further investigate the relationship between some of the variables and heart disease
+
 ### Smoke
 ```{r}
 smoke_check = glm(cardio ~ smoke + alco, data = train_data, family = binomial(link = "logit") )
@@ -1010,7 +1010,9 @@ summary(smoke_check)
 ```
 Even if taken as the single predictor, it still counterintuitively contributes negatively to `cardio`. However the significance is lower than that in the complete model.
 In the data exploration part, we saw that there were, numerically, minimal differences between groups with regard do this variable. 
-Furthermore both of these variables are *subjective*, meaning that the answer was at the respondant's discretion. This means one could straight up lie, or even, having quit recently, answer `no` even though the effects of alcohol consumption or smoking were already present. 
+Furthermore both of these variables are *subjective*, meaning that the answer was at the respondent's discretion. This means one could straight up lie, or even, having quit recently, answer *no* even though the effects of alcohol consumption or smoking were already present. 
 
 ### Glucose
+
+## References
 
