@@ -577,7 +577,127 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 **While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.**
 
+```{r barplots2}
+#Cholesterol
+cholesterol_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, cholesterol = cardio$cholesterol), 
+  FUN = sum
+)
 
+cholesterol_data$total <- ave(cholesterol_data$count, cholesterol_data$cardio, FUN = sum)
+cholesterol_data$percentage <- (cholesterol_data$count / cholesterol_data$total) * 100
+
+pChol <- ggplot(cholesterol_data, aes(x = as.factor(cardio), y = count, fill = cholesterol)) +
+  geom_bar(stat = "identity", position = "stack") + 
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(title = "Population by Cholesterol \nand disease presence", x = expression(paste("\u2003\u2003","Cardio (0 = No Disease, 1 = Disease)")), y = "Count", fill = "Cholesterol") + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
+  theme(plot.margin = margin(1, 1, 1, 2))
+
+#Glucose
+glucose_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, gluc = cardio$gluc), 
+  FUN = sum
+)
+
+glucose_data$total <- ave(glucose_data$count, glucose_data$cardio, FUN = sum)
+glucose_data$percentage <- (glucose_data$count / glucose_data$total) * 100
+
+pGluc <- ggplot(glucose_data, aes(x = as.factor(cardio), y = count, fill = gluc)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Glucose \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Glucose"
+  ) + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
+  theme_minimal()  
+
+# Smoke
+smoke_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, smoke = cardio$smoke), 
+  FUN = sum
+)
+
+smoke_data$total <- ave(smoke_data$count, smoke_data$cardio, FUN = sum)
+smoke_data$percentage <- (smoke_data$count / smoke_data$total) * 100
+
+pSmoke <- ggplot(smoke_data, aes(x = as.factor(cardio), y = count, fill = smoke)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Smoking Status \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Smoking"
+  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+# Active
+active_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, active = cardio$active), 
+  FUN = sum
+)
+
+active_data$total <- ave(active_data$count, active_data$cardio, FUN = sum)
+active_data$percentage <- (active_data$count / active_data$total) * 100
+
+pActive <- ggplot(active_data, aes(x = as.factor(cardio), y = count, fill = active)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Physical Activity \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Active"
+  ) + scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+# Alcohol
+alco_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, alco = cardio$alco), 
+  FUN = sum
+)
+
+alco_data$total <- ave(alco_data$count, alco_data$cardio, FUN = sum)
+alco_data$percentage <- (alco_data$count / alco_data$total) * 100
+
+pAlco <- ggplot(alco_data, aes(x = as.factor(cardio), y = count, fill = alco)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Alcohol Consumption \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Alcohol"
+  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+grid.arrange(pChol, pGluc,ncol = 2)
+grid.arrange(pSmoke, pActive, ncol = 2)
+grid.arrange(pAlco, ncol = 2)
+
+```
+
+```{r SAVE BARPLOTS}
+chol_gluc_BP = arrangeGrob(pChol, pGluc, ncol=2)
+smoke_active_BP = arrangeGrob(pSmoke, pActive, ncol=2)
+alcol_BP = arrangeGrob(pAlco, ncol=1)
+
+ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
+ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
+ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
+```
 
 ### Classification trees
 
