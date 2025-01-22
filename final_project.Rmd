@@ -290,6 +290,10 @@ We now proceed to plot the distribution of the numerical variables, also with re
 
 ```{r}
 set.seed(123)
+sample_indices <- sample(1:nrow(numerical), size = 1 * nrow(numerical))
+sampled_numerical <- numerical[sample_indices, ]
+sampled_cardio <- as.numeric(as.character(cardio$cardio[sample_indices]))
+
 custom_colors <- c("royalblue", "lightcoral")
 
 plot.new()
@@ -297,8 +301,8 @@ pairs(
   numerical,
   labels = colnames(numerical),
   pch = 'o',
-  bg = custom_colors[sampled_cardio + 1],
-  col = custom_colors[sampled_cardio + 1],
+  bg = custom_colors[cardio + 1],
+  col = custom_colors[cardio + 1],
   main = "\n",
   row1attop = TRUE,
   gap = 1,
@@ -315,7 +319,6 @@ legend(
   xpd = TRUE,  # Allow drawing outside the plot area
   inset = c(0.8, -0.17)
 )
-
 ```
 
 ```{r}
@@ -907,6 +910,7 @@ As we could imagine, this enhanced version of classification trees gets a better
 
 ## Logistic Regression Model
 
+```{r}
 log_model <- glm(cardio ~ ., data = train_data, family = binomial)
 
 ## Model Predictions
@@ -931,7 +935,9 @@ ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
   scale_fill_gradient(low="blue", high="red") +
   labs(title="Confusion Matrix: Logistic Regression", x="Actual", y="Predicted") +
   theme_minimal()
+```
 
+```{r}
 ## Performance Metrics Calculation
 
 # Extract confusion matrix values
@@ -958,7 +964,7 @@ metrics_df <- data.frame(
 # Print computed metrics
 print(metrics_df)
 
-# Visualisation of metrics
+# Visualization of metrics
 
 ggplot(metrics_df, aes(x=Metric, y=Value, fill=Metric)) +
   geom_bar(stat='identity') +
@@ -999,7 +1005,7 @@ ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
 ggsave("confusion_matrix_logistic.png", width=8, height=6)
 ggsave("roc_curve_logistic.png", width=8, height=6)
 ggsave("feature_importance_logistic.png", width=8, height=6)
-
+```
 
 
 ## References
