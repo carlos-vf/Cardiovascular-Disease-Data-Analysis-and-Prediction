@@ -12,3 +12,4 @@
 
 - save all images and plot grids to folder to use them in presentation. 
 - Analysis of risk factors, e.g: usually age increases blood pressure because of arteries becoming less elastic (possibly similar to analyzing the interaction terms).
+- when there is multicollinearity, the matrix X^tX matrix is ill-conditioned and can result in high variance of the predictors (or something similar, will check better) and regularization is a solution for multicollinearity.
