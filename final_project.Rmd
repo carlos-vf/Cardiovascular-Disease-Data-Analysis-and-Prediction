@@ -563,22 +563,32 @@ print(result)
 Once again, there definitely are some significant differences between the groups considered.
 
 ```{r}
-# just like in the example, we try to do "visual" clustering, see if there are any evident clusters by plotting data
-p1 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = cholesterol))
-p2 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = age_cat))
-p3 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = smoke))
-p4 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = active))
-p5 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = alco))
-p6 <- ggplot(cardio, aes(cardio, ap_hi)) + geom_point(aes(color = gluc))
+
+custom_colors <- c("darkviolet","orange", "#228b22")
+
+# Function to create plots
+create_plot <- function(color_var) {
+  ggplot(cardio, aes(cardio, ap_hi)) +
+    geom_boxplot(aes(color = !!sym(color_var))) +
+    scale_color_manual(values = custom_colors) + theme_minimal()
+}
+
+# Generate plots
+p1 <- create_plot("cholesterol")
+p2 <- create_plot("age_cat")
+p3 <- create_plot("smoke")
+p4 <- create_plot("active")
+p5 <- create_plot("alco")
+p6 <- create_plot("gluc")
+
 ```
 
 
 ```{r}
-grid.arrange(p1, p2, ncol=2)
-grid.arrange(p3, p4, ncol=2)
-grid.arrange(p5,p6, ncol=2)
+grid.arrange(p1, p2, ncol = 2)
+grid.arrange(p3, p4, ncol = 2)
+grid.arrange(p5, p6, ncol = 2)
 ```
-
 
 ```{r SAVE SCATTERPLOTS}
 first4cat = arrangeGrob(p1, p2, p3, p4, ncol=2)
