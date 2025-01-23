@@ -941,40 +941,6 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 cm_table <- as.data.frame(cm$table)
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
-# Use the train() function correctly
-log_model_all <- train(
-  cardio ~ .,                    # Formula
-  data = cardio,             # Dataset
-  method = "glm",                # Correct method for logistic regression
-  family = binomial(link = "logit"),  # Logistic regression
-  trControl = ctrl,              # Cross-validation settings
-  metric = "Accuracy"            # Appropriate metric for classification
-)
-
-# Print and summarize the model
-print(log_model_all)
-```
-```{r}
-summary(log_model_all)
-```
-There are several seemingly weird effects in this model:
-- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
-```{r}
-## Model Predictions
-log_pred <- predict(log_model, newdata = test_data, type = 'response')
-log_pred_class <- factor(ifelse(log_pred > 0.5, "1", "0"))
-
-# Model Evaluation
-
-## Confusion Matrix for Logistic Regression
-
-conf_matrix <- confusionMatrix(log_pred_class, test_data$cardio)
-print(conf_matrix)
-
-## Confusion Matrix Visualization
-
-confusion_df <- as.data.frame(conf_matrix$table)
-ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
 # Plot the confusion matrix
 ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
@@ -1011,6 +977,7 @@ print(metrics_df)
 ```
 
 As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
+
 
 ## Logistic Regression Model
 ```{r}
@@ -1157,7 +1124,7 @@ log_model_ap_pu <- train(
 
 print(log_model_ap_pu)
 ```
-<<<<<<< HEAD
+
 
 ## Other models
 We consider the square of age, as as one gets older health is more fragile.
