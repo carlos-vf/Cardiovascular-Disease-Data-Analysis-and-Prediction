@@ -3,12 +3,7 @@ title: "clustering"
 output: html_document
 date: "2025-01-19"
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-```{r cars}
+```{r}
 cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
 cardio <- cardio_with_id[,-1]
 sum(as.numeric(is.na(cardio)))
@@ -438,9 +433,34 @@ modes_cluster_differences
 
 # Further attempt at hierarchical clustering
 ```{r}
-dist_matrix_hc = daisy(as.matrix(sample_cardio_onlynums), metric = "gower")
+# Detect the number of cores
+cores <- detectCores()
+cl <- makeCluster(cores)  # Create a cluster with all available cores
+registerDoParallel(cl)    # Register the parallel backend
 
-hierarchical = hclust(dist_matrix_hc, method = "centroid")
+# Define a function to compute the distance matrix for a subset of rows
+compute_partial_daisy <- function(data, rows, metric) {
+  daisy(data[rows, ], metric = metric)
+}
+
+
+# Split the data indices into chunks for parallel processing
+chunk_size <- 1000 # Adjust this based on memory and computation limits
+indices <- split(1:nrow(cardio_scaled_onlynums), ceiling(seq_along(1:nrow(cardio_scaled_onlynums)) / chunk_size))
+
+sample_cardio_onlynums <- cardio_scaled_onlynums[sample(nrow(cardio_scaled_onlynums), 35000), ]
+
+# Parallel computation of partial distance matrices
+partial_distances <- foreach(chunk = indices, .combine = cbind, .packages = "cluster") %dopar% {
+  compute_partial_daisy(cardio_scaled_onlynums, chunk, metric = "gower")
+}
+# Combine partial distance matrices (if needed, depending on format)
+dist_matrix_hc <- as.dist(partial_distances)
+
+# Free resources
+stopCluster(cl)
+
+hierarchical = hclust(dist_matrix_hc, method = "ward.D2")
 dev.off()  # Close any active graphics devices
 cutree(hierarchical, k = 5)  # Replace k with the intended number of clusters
 plot(hierarchical, hang = -1)  # Better leaf alignment

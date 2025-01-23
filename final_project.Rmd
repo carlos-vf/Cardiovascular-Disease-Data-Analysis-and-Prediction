@@ -219,6 +219,40 @@ cardio_cl <- cardio
 
 There are only 4 observations concerning people < 40 years old, and the youngest one in the sample is 30: for this reason, we split between under (or equal to) and over 55.
 
+### Correlation analysis
+
+
+The heatmap confirms some (perhaps rather intuitive) relationships:\
+- Diastolic and systolic blood pressure are heavily correlated\
+- Both weight and age are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.\
+
+```{r}
+library(reshape2)
+library(ggplot2)
+cor_cardio <- round(cor(as.data.frame(cardio)), 2)
+
+melt_cardio <- melt(cor_cardio, na.rm = TRUE)  
+labels <- c(
+  "age","gender*", "height", "weight", "ap_hi", "ap_lo", "cholesterol*", "gluc*", "smoke*", "alco*", "active*", "cardio*")  
+corr_heatmap<- ggplot(data = melt_cardio, aes(x = Var1, y = Var2, fill = value)) + 
+  geom_tile() +
+  geom_text(aes(label = value), size = 4) + 
+  scale_fill_gradient2(low = "blue", high = "red", limit = c(-1, 1), name = "Correlation") +
+  scale_x_discrete(labels = labels) +  
+  scale_y_discrete(labels = labels) + 
+  theme_minimal() +  labs(caption = "Variables marked with * are categorical.") +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    axis.text.y = element_text(size = 10)  
+  )
+
+corr_heatmap
+ggsave("images/corrheatmap.png", corr_heatmap, width = 8, height = 8)
+
+```
+
 ```{r age_categorizing}
 cardio$age_cat <- ifelse(cardio$age <= 55, '30-55', '55-65')
 table(cardio$age_cat)
@@ -387,27 +421,7 @@ plots_density <- list(
 )
 save_plots(plots_density)
 ```
-### Correlation analysis
 
-```{r}
-cor_cardio = round(cor(as.data.frame(numerical)), 2)
-melt_cardio = melt(cor_cardio)
-
-corr_heatmap = ggplot(data = melt_cardio, aes(x=Var1, y=Var2, fill=value)) + 
-  geom_tile() +
-  geom_text(aes(Var2, Var1, label = value), size = 5) +
-  scale_fill_gradient2(low = "blue", high = "red",
-                       limit = c(-1,1), name="Correlation") +
-  theme(axis.title.x = element_blank(),
-        axis.title.y = element_blank(),
-        panel.background = element_blank())
-corr_heatmap
-ggsave("images/corrheatmap.png", corr_heatmap, width = 8, height = 8)
-```
-
-The heatmap confirms some (perhaps rather intuitive) relationships:\
-- Diastolic and systolic blood pressure are heavily correlated\
-- Both weight and age are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.\
 
 Let's now explore the possible relationships of the categorical variables with cardio.
 
@@ -577,7 +591,127 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 **While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.**
 
+```{r barplots2}
+#Cholesterol
+cholesterol_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, cholesterol = cardio$cholesterol), 
+  FUN = sum
+)
 
+cholesterol_data$total <- ave(cholesterol_data$count, cholesterol_data$cardio, FUN = sum)
+cholesterol_data$percentage <- (cholesterol_data$count / cholesterol_data$total) * 100
+
+pChol <- ggplot(cholesterol_data, aes(x = as.factor(cardio), y = count, fill = cholesterol)) +
+  geom_bar(stat = "identity", position = "stack") + 
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(title = "Population by Cholesterol \nand disease presence", x = expression(paste("\u2003\u2003","Cardio (0 = No Disease, 1 = Disease)")), y = "Count", fill = "Cholesterol") + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
+  theme(plot.margin = margin(1, 1, 1, 2))
+
+#Glucose
+glucose_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, gluc = cardio$gluc), 
+  FUN = sum
+)
+
+glucose_data$total <- ave(glucose_data$count, glucose_data$cardio, FUN = sum)
+glucose_data$percentage <- (glucose_data$count / glucose_data$total) * 100
+
+pGluc <- ggplot(glucose_data, aes(x = as.factor(cardio), y = count, fill = gluc)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Glucose \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Glucose"
+  ) + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
+  theme_minimal()  
+
+# Smoke
+smoke_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, smoke = cardio$smoke), 
+  FUN = sum
+)
+
+smoke_data$total <- ave(smoke_data$count, smoke_data$cardio, FUN = sum)
+smoke_data$percentage <- (smoke_data$count / smoke_data$total) * 100
+
+pSmoke <- ggplot(smoke_data, aes(x = as.factor(cardio), y = count, fill = smoke)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Smoking Status \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Smoking"
+  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+# Active
+active_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, active = cardio$active), 
+  FUN = sum
+)
+
+active_data$total <- ave(active_data$count, active_data$cardio, FUN = sum)
+active_data$percentage <- (active_data$count / active_data$total) * 100
+
+pActive <- ggplot(active_data, aes(x = as.factor(cardio), y = count, fill = active)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Physical Activity \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Active"
+  ) + scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+# Alcohol
+alco_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, alco = cardio$alco), 
+  FUN = sum
+)
+
+alco_data$total <- ave(alco_data$count, alco_data$cardio, FUN = sum)
+alco_data$percentage <- (alco_data$count / alco_data$total) * 100
+
+pAlco <- ggplot(alco_data, aes(x = as.factor(cardio), y = count, fill = alco)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Alcohol Consumption \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Alcohol"
+  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+grid.arrange(pChol, pGluc,ncol = 2)
+grid.arrange(pSmoke, pActive, ncol = 2)
+grid.arrange(pAlco, ncol = 2)
+
+```
+
+```{r SAVE BARPLOTS}
+chol_gluc_BP = arrangeGrob(pChol, pGluc, ncol=2)
+smoke_active_BP = arrangeGrob(pSmoke, pActive, ncol=2)
+alcol_BP = arrangeGrob(pAlco, ncol=1)
+
+ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
+ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
+ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
+```
 
 ### Classification trees
 
@@ -586,6 +720,7 @@ In order to correctly fit the random forest model, let's analyze first some simp
 Firstly proposed by [@breiman1984classification], decision trees (or classification trees, when dealing with a discrete target variable) are unsupervised learning algorithms. The idea consists on recursively partition the feature space and assign a label to each resulting partition. The tree is then used to classify future points according to these splits and labels. The key advantage of decision trees over other methods is their high interpretability, a quality usually wanted when working in fields like healthcare [@bertsimas2017optimal].
 
 The dataset will be split in two parts: 80% for training the model and 20% for validation. 
+## TRAIN TEST SPLIT
 ```{r classification trees (high cp) 1}
 # Split data (train/test)
 set.seed(123)
@@ -784,8 +919,23 @@ As we could imagine, this enhanced version of classification trees gets a better
 
 ## Logistic Regression Model
 ```{r}
-log_model <- glm(cardio ~ ., data = train_data, family = binomial(link = "logit"))
-summary(log_model)
+ctrl <- trainControl(method = "cv", number = 5)  # Cross-validation setup
+
+# Use the train() function correctly
+log_model_all <- train(
+  cardio ~ .,                    # Formula
+  data = train_data,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "Accuracy"            # Appropriate metric for classification
+)
+
+# Print and summarize the model
+print(log_model_all)
+```
+```{r}
+summary(log_model_all)
 ```
 There are several seemingly weird effects in this model:
 - a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
@@ -869,14 +1019,11 @@ ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
   labs(title="Feature Importance - Logistic Regression",
        x="Feature", y="Importance (Coefficient Absolute Value)") +
   theme_minimal()
-
-
-  # Visualizations
-
-ggsave("confusion_matrix_logistic.png", width=8, height=6)
-ggsave("roc_curve_logistic.png", width=8, height=6)
-ggsave("feature_importance_logistic.png", width=8, height=6)
 ```
+We plot the absolute magnitude of every variable. The results are puzzling: cholesterol has very high importance, while pressure measurements matter much less than expected.
+We hypothesize that this could be due to some sort of "correspondence" or "multicollinearity" between some variables:
+- `gluc` and `cholesterol`
+- `smoke` and `alco`
 
 Let's now further investigate the relationship between some of the variables and heart disease
 
@@ -890,6 +1037,30 @@ In the data exploration part, we saw that there were, numerically, minimal diffe
 Furthermore both of these variables are *subjective*, meaning that the answer was at the respondent's discretion. This means one could straight up lie, or even, having quit recently, answer *no* even though the effects of alcohol consumption or smoking were already present. 
 
 ### Glucose
+```{r}
+gluc_check = glm(cardio ~ gluc + cholesterol, data = train_data, family = binomial(link = "logit"))
+summary(gluc_check)
+```
+High levels of cholesterol are positively correlated with high glucose, as expected.
+```{r}
+interaction_gluc_cardio = glm(cardio ~ gluc*cholesterol, data = train_data, family = binomial(link = "logit"))
+summary(interaction_gluc_cardio)
+```
+The weird effect is present just on levels of `gluc` above normal when they interact with high cholesterol. Taken individually, when they are significant, they contribute positively to the insurgence of heart diseases, as expected.  
 
+## Combining pressures
+We create a new variable that combines the pressure measurements: `ap_hu` is the difference between `ap_lo` and `ap_hi`.
+```{r}
+cardio$ap_pu = cardio$ap_hi - cardio$ap_lo
+log_model_ap_pu <- train(
+  cardio ~ . -ap_hi - ap_lo,                    # Formula
+  data = train_data,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "Accuracy"            # Appropriate metric for classification
+)
+
+summary(log_model_ap_pu)
+```
 ## References
-
