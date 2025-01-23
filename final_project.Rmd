@@ -910,7 +910,7 @@ ctrl <- trainControl(method = "cv", number = 5)  # Cross-validation setup
 # Use the train() function correctly
 log_model_all <- train(
   cardio ~ .,                    # Formula
-  data = train_data,             # Dataset
+  data = cardio,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
@@ -1048,6 +1048,96 @@ log_model_ap_pu <- train(
 )
 
 summary(log_model_ap_pu)
+```
+
+## Other models
+We consider the square of age, as as one gets older health is more fragile.
+```{r}
+age_sq = glm(cardio ~ . - ap_pu + poly(age, degree = 2), data = cardio, family = binomial(link = "logit") )
+summary(age_sq)
+age_sq$aic
+```
+
+## Interaction model
+```{r}
+model_int = glm(cardio ~ . -ap_lo -ap_hi + cholesterol*gluc, data = cardio, family = binomial(link = "logit"))
+summary(model_int)
+```
+## Model diagnostics
+```{r}
+model_all = glm(cardio ~ . - ap_pu, data = cardio, family = binomial(link = "logit"))
+summary(model_all)
+print(model_all$aic)
+
+
+library(car)
+vif_values = vif(model_all)
+vif_values
+```
+Apparently there is no multicollinearity.
+
+Let's check the residual plots
+```{r}
+
+fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
+
+pred <- predict(fit, type = "response")
+res <- residuals(fit, type = "response")
+plot(c(0, 1), c(-1, 1), xlab = "Estimated Pr(Switching)", type = "n",
+     ylab = "Observed - Estimated", main = "Residual Plot")
+abline(h = 0, col = "gray", lwd = 0.5)
+points(pred, res, pch = 20, cex = 0.2)
+abline(c(0, -1), col = "red", lwd = 0.25)
+abline(c(1, -1), col = "red", lwd = 0.25)
+
+binned.resids <- function(x, y, nclass = sqrt(length(x))){
+  breaks.index <- floor(length(x) * (1 : (nclass))/nclass)
+  breaks <- c(-Inf, sort(x)[breaks.index], Inf)
+  output <- xbreaks <- NULL
+  x.binned <- as.numeric(cut(x, breaks))
+  for(i in 1:nclass){
+    items <- (1:length(x))[x.binned == i]
+    x.range <- range(x[items])
+    xbar <- mean(x[items])
+    ybar <- mean(y[items])
+    n <- length(items)
+    sdev <- sd(y[items])
+    output <- rbind(output, c(xbar, ybar, n, x.range, 2 * sdev/sqrt(n)))
+  }
+  colnames(output) <- c("xbar", "ybar", "n", "x.lo", "x.hi", "2se")
+  return(list(binned = output, xbreaks = xbreaks))
+}
+
+br <- binned.resids(pred, res, nclass = 50)$binned
+plot(range(br[,1]), range(br[,2],br[,6], -br[,6]), type = "n",
+     xlab = "Estimated Pr(Switching)", ylab = "Average residual", main = "Binned Residual Plot")
+abline(h = 0, col = "gray", lwd = 0.5); points(br[,1], br[,2], pch = 19, cex = 0.5)
+lines(br[,1], br[,6], col = "gray", lwd = 0.5); lines(br[,1], -br[,6], col = "gray", lwd = 0.5)
+
+```
+!!! THE RESIDUALS ARE DEFINITELY FOLLOWING A PATTERN
+
+Let's check with the individual variables (not working)
+```{r}
+par(mfrow = c(1, 2))
+br.ap_hi <- binned.resids(cardio$ap_hi, res,
+                         nclass = 40)$binned
+plot(range(br.ap_hi[,1]), range(br.ap_hi[,2], br.ap_hi[,6], -br.ap_hi[,6]), type = "n",
+     xlab = "Distance", ylab = "Average residual", main = "Binned residual plot")
+abline(h = 0, col = "gray", lwd = 0.5)
+lines(br.ap_hi[,1], br.ap_hi[,6], col = "gray", lwd = 0.5)
+lines(br.ap_hi[,1], -br.ap_hi[,6], col = "gray", lwd = 0.5)
+points(br.ap_hi[,1], br.ap_hi[,2], pch = 19, cex = 0.5)
+
+br.ap_lo <- binned.resids(cardio$ap_lo, res,
+                            nclass = 40)$binned
+plot(range(br.ap_lo[,1]), range(br.ap_lo[,2], br.ap_lo[,6], -br.ap_lo[,6]), type = "n",
+     xlab = "Arsenic concentration", ylab = "Average residual", main = "Binned residual plot")
+abline(h = 0, col = "gray", lwd = 0.5)
+lines(br.ap_lo[,1], br.ap_lo[,6], col = "gray", lwd = 0.5)
+lines(br.ap_lo[,1], -br.ap_lo[,6], col = "gray", lwd = 0.5)
+points(br.ap_lo[,1], br.ap_lo[,2], pch = 19, cex = 0.5)
+
 ```
 ## References
 
