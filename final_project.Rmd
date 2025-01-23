@@ -901,6 +901,11 @@ rf_model <- train(
 
 # Free resources
 stopCluster(cl)
+unregister_dopar <- function() {
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
+}
+unregister_dopar()
 
 # Final model
 print(rf_model)
@@ -912,6 +917,9 @@ print(rf_model)
 Regarding the performance of the final model:
 
 ```{r random forest (performance) 3}
+# General results
+rf_model$results
+
 # Get predicted probabilities
 predictions <- rf_model$finalModel$predictions
 predicted_probs <- predictions[, "Yes"] 
@@ -919,67 +927,35 @@ actual_labels <- cardio_cl$cardio
 
 # Manually compute the area under ROC curve
 roc_curve <- roc(actual_labels, predicted_probs)
-print(paste("AUC:", auc(roc_curve)))
 
 # ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 ```
 
-As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
+```{r rf_model_confusion_matrix}
+## Confusion Matrix for Random Forest
+predicted_class <- ifelse(predicted_probs >= 0.5, "Yes", "No")
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
-## Logistic Regression Model
-```{r}
-ctrl <- trainControl(method = "cv", number = 5)  # Cross-validation setup
+# Convert the confusion matrix into a table
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
-# Use the train() function correctly
-log_model_all <- train(
-  cardio ~ .,                    # Formula
-  data = train_data,             # Dataset
-  method = "glm",                # Correct method for logistic regression
-  family = binomial(link = "logit"),  # Logistic regression
-  trControl = ctrl,              # Cross-validation settings
-  metric = "Accuracy"            # Appropriate metric for classification
-)
-
-# Print and summarize the model
-print(log_model_all)
-```
-```{r}
-summary(log_model_all)
-```
-There are several seemingly weird effects in this model:
-- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
-```{r}
-## Model Predictions
-log_pred <- predict(log_model, newdata = test_data, type = 'response')
-log_pred_class <- factor(ifelse(log_pred > 0.5, "1", "0"))
-
-# Model Evaluation
-
-## Confusion Matrix for Logistic Regression
-
-conf_matrix <- confusionMatrix(log_pred_class, test_data$cardio)
-print(conf_matrix)
-
-## Confusion Matrix Visualization
-
-confusion_df <- as.data.frame(conf_matrix$table)
-ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
+# Plot the confusion matrix
+ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
-  geom_text(aes(label=Freq), color="white", size=5) +
-  scale_fill_gradient(low="blue", high="red") +
-  labs(title="Confusion Matrix: Logistic Regression", x="Actual", y="Predicted") +
-  theme_minimal()
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Random Forest", x = "Actual", y = "Predicted")
 ```
 
-```{r}
+```{r rf_model_other_metrics}
 ## Performance Metrics Calculation
-
-# Extract confusion matrix values
-TN <- conf_matrix$table[1,1]
-FP <- conf_matrix$table[1,2]
-FN <- conf_matrix$table[2,1]
-TP <- conf_matrix$table[2,2]
+TN <- cm$table[1,1]
+FP <- cm$table[1,2]
+FN <- cm$table[2,1]
+TP <- cm$table[2,2]
 
 # Calculate metrics
 accuracy <- (TP + TN) / (TP + TN + FP + FN)
@@ -1000,15 +976,89 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
-```{r}
+As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
-## ROC Curve for Logistic Regression
-roc_curve <- roc(test_data$cardio, log_pred)
-plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
+## Logistic Regression Model
+```{r}
+ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
+
+# Cross-validation
+log_model <- train(
+  cardio ~ .,                    # Formula
+  data = cardio_cl,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "ROC"            # Appropriate metric for classification
+)
+
+# Print and summarize the model
+print(log_model)
 ```
 
-```{r}
-print(auc(roc_curve))
+### Performance
+
+```{r log_model_performance}
+# General results
+log_model$results
+
+# Get predicted probabilities
+predictions <- predict(log_model, newdata = log_model$trainingData, type = "prob")
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- cardio_cl$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve <- roc(actual_labels, predicted_probs)
+
+# ROC curve
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+```
+
+There are several seemingly weird effects in this model:
+- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
+
+```{r log_model_confusion_matrix}
+## Confusion Matrix for Logistic Regression
+predicted_class <- ifelse(predicted_probs >= 0.5, "Yes", "No")
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
+
+# Convert the confusion matrix into a table
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
+
+# Plot the confusion matrix
+ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+  geom_tile() +
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Logistic Regression", x = "Actual", y = "Predicted")
+```
+
+```{r lg_model_other_metrics}
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[1,2]
+FN <- cm$table[2,1]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+
+# Print computed metrics
+print(metrics_df)
 ```
 
 ```{r lr-feature-importance}
@@ -1023,7 +1073,7 @@ importance_lr <- importance_lr[importance_lr$Feature != "(Intercept)", ]
 colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Feature")
 
 # Plot feature importance
-ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
+ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
   labs(title="Feature Importance - Logistic Regression",
@@ -1064,13 +1114,13 @@ We create a new variable that combines the pressure measurements: `ap_hu` is the
 cardio$ap_pu = cardio$ap_hi - cardio$ap_lo
 log_model_ap_pu <- train(
   cardio ~ . -ap_hi - ap_lo,                    # Formula
-  data = train_data,             # Dataset
+  data = cardio_cl,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
-  metric = "Accuracy"            # Appropriate metric for classification
+  metric = "ROC"            # Appropriate metric for classification
 )
 
-summary(log_model_ap_pu)
+print(log_model_ap_pu)
 ```
 ## References
