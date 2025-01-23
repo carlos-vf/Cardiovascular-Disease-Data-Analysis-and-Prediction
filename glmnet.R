@@ -1,4 +1,32 @@
+cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
+cardio <- cardio_with_id[,-1]
+cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo | cardio$ap_hi-cardio$ap_lo > 250),]
+cardio$gender <- factor(cardio$gender)
+levels(cardio$gender) = c("F", "M")
+
+cardio$cardio <- as.factor(cardio$cardio)
+
+cardio$cholesterol <- factor(cardio$cholesterol)
+levels(cardio$cholesterol) = c("normal", "above normal", "well above normal")
+
+cardio$gluc <- factor(cardio$gluc)
+levels(cardio$gluc) = c("normal", "above normal", "well above normal")
+
+cardio$smoke <- factor(cardio$smoke)
+levels(cardio$smoke) = c("No", "Yes")
+
+cardio$alco <- factor(cardio$alco)
+levels(cardio$alco) = c("No", "Yes")
+
+cardio$active <- factor(cardio$active)
+levels(cardio$active) = c("No", "Yes")
+set.seed(23)
+train_index <- sample(1:nrow(cardio), 0.8 * nrow(cardio))  
+train_data <- cardio[train_index, ]
+test_data <- cardio[-train_index, ]
+
 # Model matrix creation
+
 train_data_dummies <- model.matrix(cardio ~ ., data = train_data)[, -1]  # Exclude intercept column
 test_data_dummies <- model.matrix(cardio ~ ., data = test_data)[, -1]    # Exclude intercept column
 
@@ -7,7 +35,9 @@ Y_train <- as.numeric(train_data$cardio) - 1  # Assuming 'cardio' is a factor va
 X_test <- scale(test_data_dummies)
 
 # Fit the model using cv.glmnet
-cvfit <- cv.glmnet(X_train, Y_train, family = "binomial", type.measure = "auc")
+cvfit <- cv.glmnet(X_train, Y_train, family = "binomial", type.measure = "class")
+plot(cvfit)
+print(cvfit)
 
 # Get optimal lambda values
 lambda_min <- cvfit$lambda.min
@@ -115,3 +145,9 @@ cat("\nTest Confusion Matrix (Lambda.Min):\n")
 print(test_conf_matrix_min)
 cat("\nTest Confusion Matrix (Lambda.1SE):\n")
 print(test_conf_matrix_1se)
+
+
+
+
+
+
