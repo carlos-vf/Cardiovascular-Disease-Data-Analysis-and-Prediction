@@ -197,7 +197,7 @@ A cut-off value value for the blood pressure is selected (generously) by basing 
 
 ```{r}
 summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
-cardio <- cardio[!(cardio$ap_hi < 0 | cardio$ap_hi > 400 | cardio$ap_lo < 0 | cardio$ap_lo > 400 | cardio$ap_hi < cardio$ap_lo | cardio$ap_hi-cardio$ap_lo > 250),]
+cardio <- cardio[!(cardio$ap_hi < 25 | cardio$ap_hi > 400 | cardio$ap_lo <  10| cardio$ap_lo > 400 | cardio$ap_hi < (cardio$ap_lo + 1) | cardio$ap_hi-cardio$ap_lo > 160),]
 ```
 
 1274 observations have completely unrealistic values for either systolic or diastolic pressure (or both). In 274 of them, the systolic pressure is less than the diastolic, which is also not possible. These wrong metrics are less than 2% of the dataset, so the most straightforward approach is just to eliminate the problematic rows. \
@@ -901,6 +901,11 @@ rf_model <- train(
 
 # Free resources
 stopCluster(cl)
+unregister_dopar <- function() {
+  env <- foreach:::.foreachGlobals
+  rm(list=ls(name=env), pos=env)
+}
+unregister_dopar()
 
 # Final model
 print(rf_model)
@@ -912,6 +917,9 @@ print(rf_model)
 Regarding the performance of the final model:
 
 ```{r random forest (performance) 3}
+# General results
+rf_model$results
+
 # Get predicted probabilities
 predictions <- rf_model$finalModel$predictions
 predicted_probs <- predictions[, "Yes"] 
@@ -919,22 +927,24 @@ actual_labels <- cardio_cl$cardio
 
 # Manually compute the area under ROC curve
 roc_curve <- roc(actual_labels, predicted_probs)
-print(paste("AUC:", auc(roc_curve)))
 
 # ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 ```
 
-As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
+```{r rf_model_confusion_matrix}
+## Confusion Matrix for Random Forest
+predicted_class <- ifelse(predicted_probs >= 0.5, "Yes", "No")
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
-## Logistic Regression Model
-```{r}
-ctrl <- trainControl(method = "cv", number = 5)  # Cross-validation setup
+# Convert the confusion matrix into a table
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Use the train() function correctly
 log_model_all <- train(
   cardio ~ .,                    # Formula
-  data = train_data,             # Dataset
+  data = cardio,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
@@ -965,21 +975,21 @@ print(conf_matrix)
 
 confusion_df <- as.data.frame(conf_matrix$table)
 ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
+# Plot the confusion matrix
+ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
-  geom_text(aes(label=Freq), color="white", size=5) +
-  scale_fill_gradient(low="blue", high="red") +
-  labs(title="Confusion Matrix: Logistic Regression", x="Actual", y="Predicted") +
-  theme_minimal()
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Random Forest", x = "Actual", y = "Predicted")
 ```
 
-```{r}
+```{r rf_model_other_metrics}
 ## Performance Metrics Calculation
-
-# Extract confusion matrix values
-TN <- conf_matrix$table[1,1]
-FP <- conf_matrix$table[1,2]
-FN <- conf_matrix$table[2,1]
-TP <- conf_matrix$table[2,2]
+TN <- cm$table[1,1]
+FP <- cm$table[1,2]
+FN <- cm$table[2,1]
+TP <- cm$table[2,2]
 
 # Calculate metrics
 accuracy <- (TP + TN) / (TP + TN + FP + FN)
@@ -1000,15 +1010,89 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
-```{r}
+As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
-## ROC Curve for Logistic Regression
-roc_curve <- roc(test_data$cardio, log_pred)
-plot(roc_curve, col="blue", main="ROC Curve - Logistic Regression")
+## Logistic Regression Model
+```{r}
+ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
+
+# Cross-validation
+log_model <- train(
+  cardio ~ .,                    # Formula
+  data = cardio_cl,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "ROC"            # Appropriate metric for classification
+)
+
+# Print and summarize the model
+print(log_model)
 ```
 
-```{r}
-print(auc(roc_curve))
+### Performance
+
+```{r log_model_performance}
+# General results
+log_model$results
+
+# Get predicted probabilities
+predictions <- predict(log_model, newdata = log_model$trainingData, type = "prob")
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- cardio_cl$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve <- roc(actual_labels, predicted_probs)
+
+# ROC curve
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+```
+
+There are several seemingly weird effects in this model:
+- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
+
+```{r log_model_confusion_matrix}
+## Confusion Matrix for Logistic Regression
+predicted_class <- ifelse(predicted_probs >= 0.5, "Yes", "No")
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
+
+# Convert the confusion matrix into a table
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
+
+# Plot the confusion matrix
+ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+  geom_tile() +
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Logistic Regression", x = "Actual", y = "Predicted")
+```
+
+```{r lg_model_other_metrics}
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[1,2]
+FN <- cm$table[2,1]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+
+# Print computed metrics
+print(metrics_df)
 ```
 
 ```{r lr-feature-importance}
@@ -1023,7 +1107,7 @@ importance_lr <- importance_lr[importance_lr$Feature != "(Intercept)", ]
 colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Feature")
 
 # Plot feature importance
-ggplot(importance_lr, aes(x=reorder(Feature, abs(Estimate)), y=abs(Estimate))) +
+ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
   labs(title="Feature Importance - Logistic Regression",
@@ -1064,13 +1148,260 @@ We create a new variable that combines the pressure measurements: `ap_hu` is the
 cardio$ap_pu = cardio$ap_hi - cardio$ap_lo
 log_model_ap_pu <- train(
   cardio ~ . -ap_hi - ap_lo,                    # Formula
-  data = train_data,             # Dataset
+  data = cardio_cl,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
-  metric = "Accuracy"            # Appropriate metric for classification
+  metric = "ROC"            # Appropriate metric for classification
 )
 
-summary(log_model_ap_pu)
+print(log_model_ap_pu)
 ```
+
+
+
+## Model diagnostics
+
+Let's check the residual plots
+```{r original_residuals}
+fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
+pred <- predict(fit, type = "response")
+res <- residuals(fit, type = "response")
+
+pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit$fitted.values*(1 - fit$fitted.values))
+plot(cardio$ap_hi, pearson_residuals)
+```
+This graph shows *Pearson residuals*, which are the equivalent of standardized residuals for GLMs. 
+We can see that they are larger at the extremes: they correspond to the points we previously pointed out in the scatter plot, which represent either individuals with low blood pressure which present heart disease, or those with high blood pressure which donàt have any disease. 
+
+```{r original_residuals}
+binnedplot(pred,res, nclass = 1000)
+```
+Let's see if a polynomial regression can improve the model's fit
+
+
+```{r}
+fit_poly3 <- glm(cardio ~ .+poly(ap_hi, 3), data = cardio, family = binomial(link = "logit"))
+
+pred <- predict(fit_poly3, type = "response")
+res <- residuals(fit_poly3, type = "response")
+summary(fit_poly3)
+pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit_poly3$fitted.values*(1 - fit_poly3$fitted.values))
+plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
+
+binnedplot(pred,res, nclass = 1000)
+```
+```{r}
+fit_poly4 <- glm(cardio ~ .+poly(ap_hi, 4), data = cardio, family = binomial(link = "logit"))
+
+pred <- predict(fit_poly4, type = "response")
+res <- residuals(fit_poly4, type = "response")
+summary(fit_poly4)
+pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit_poly4$fitted.values)/sqrt(fit_poly4$fitted.values*(1 - fit_poly4$fitted.values))
+plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
+
+binnedplot(pred,res, nclass = 1000)
+br <- arm::binned.resids(pred,res)
+```
+
+It's possible to see that by considering the polynomials of systolic blood pressure, the residuals follow less of a pattern. Further factors (like higher polynomials and multiple interactions) were also considered but they did not contribute to improving the model. 
+
+We still get strange values for some coefficients (e.g gluc).
+We apply LASSO regression to see what coefficients are actually important.
+```{r}
+set.seed(23)
+# Model matrix creation
+train_data_dummies <- model.matrix(cardio ~ ., data = train_data)[, -1]  # Exclude intercept column
+test_data_dummies <- model.matrix(cardio ~ ., data = test_data)[, -1]    # Exclude intercept column
+
+X_train <- scale(train_data_dummies)
+Y_train <- as.numeric(train_data$cardio) - 1  # Assuming 'cardio' is a factor variable (0/1)
+X_test <- scale(test_data_dummies)
+Y_test <- as.numeric(test_data$cardio) - 1  # Assuming 'cardio' is a factor variable (0/1)
+
+# Fit the model using cv.glmnet
+cvfit <- cv.glmnet(X_train, Y_train, family = "binomial", type.measure = "class", alpha = 1)
+plot(cvfit)
+```
+
+
+```{r}
+print(cvfit)
+```
+By using a $\lambda$ which produces a misclassification error within 1 standard error from the minimum's, we obtain similar results ì, while also simplifying the model: those problematic coefficients from before are shrunk to 0, underlying their secondary importance in determining the presence of heart disease. This is indeed consistent with what we had supposed in our initial exploration of the data. 
+
+```{r}
+# Get optimal lambda values
+lambda_min <- cvfit$lambda.min
+lambda_1se <- cvfit$lambda.1se
+cat("Lambda.min:", lambda_min, "\n")
+cat("Lambda.1se:", lambda_1se, "\n")
+```
+
+
+```{r}
+# Coefficients
+cat("Coefficients at lambda.min:\n")
+print(coef(cvfit, s = "lambda.min"))
+```
+
+
+```{r}
+cat("Coefficients at lambda.1se:\n")
+print(coef(cvfit, s = "lambda.1se"))
+```
+
+
+```{r}
+# Predictions on test data
+predictions <- predict(cvfit, newx = X_test, s = "lambda.min", type = "response")
+predicted_classes <- ifelse(predictions > 0.5, 1, 0)
+```
+
+
+```{r}
+# Training predictions (lambda.min)
+train_predictions_min <- predict(cvfit, newx = X_train, s = "lambda.min", type = "response")
+train_pred_classes_min <- ifelse(train_predictions_min > 0.5, 1, 0)
+train_accuracy_min <- mean(train_pred_classes_min == Y_train)
+train_roc_min <- roc(Y_train, as.vector(train_predictions_min))
+train_conf_matrix_min <- table(Predicted = train_pred_classes_min, Actual = Y_train)
+
+# Test predictions (lambda.min)
+test_predictions_min <- predict(cvfit, newx = X_test, s = "lambda.min", type = "response")
+test_pred_classes_min <- ifelse(test_predictions_min > 0.5, 1, 0)
+test_accuracy_min <- mean(test_pred_classes_min == as.numeric(test_data$cardio) - 1)
+test_roc_min <- roc(as.numeric(test_data$cardio) - 1, as.vector(test_predictions_min))
+test_conf_matrix_min <- table(Predicted = test_pred_classes_min, Actual = as.numeric(test_data$cardio) - 1)
+
+# Training predictions (lambda.1se)
+train_predictions_1se <- predict(cvfit, newx = X_train, s = "lambda.1se", type = "response")
+train_pred_classes_1se <- ifelse(train_predictions_1se > 0.5, 1, 0)
+train_accuracy_1se <- mean(train_pred_classes_1se == Y_train)
+train_roc_1se <- roc(Y_train, as.vector(train_predictions_1se))
+train_conf_matrix_1se <- table(Predicted = train_pred_classes_1se, Actual = Y_train)
+
+
+# Test predictions (lambda.1se)
+test_predictions_1se <- predict(cvfit, newx = X_test, s = "lambda.1se", type = "response")
+test_pred_classes_1se <- ifelse(test_predictions_1se > 0.5, 1, 0)
+test_accuracy_1se <- mean(test_pred_classes_1se == as.numeric(test_data$cardio) - 1)
+test_roc_1se <- roc(as.numeric(test_data$cardio) - 1, as.vector(test_predictions_1se))
+test_conf_matrix_1se <- table(Predicted = test_pred_classes_1se, Actual = as.numeric(test_data$cardio) - 1)
+
+
+# Calculate MSE for training and test sets
+train_mse_min <- mean((train_predictions_min - Y_train)^2)
+train_mse_1se <- mean((train_predictions_1se - Y_train)^2)
+test_mse_min <- mean((test_predictions_min - (as.numeric(test_data$cardio) - 1))^2)
+test_mse_1se <- mean((test_predictions_1se - (as.numeric(test_data$cardio) - 1))^2)
+
+
+# Create a summary table
+results <- data.frame(
+  Metric = c(
+    "Training Accuracy", "Training AUC", "Training MSE",
+    "Test Accuracy", "Test AUC", "Test MSE"
+  ),
+  Lambda_Min = c(
+    train_accuracy_min, auc(train_roc_min), train_mse_min,
+    test_accuracy_min, auc(test_roc_min), test_mse_min
+  ),
+  Lambda_1SE = c(
+    train_accuracy_1se, auc(train_roc_1se), train_mse_1se,
+    test_accuracy_1se, auc(test_roc_1se), test_mse_1se
+  )
+)
+
+cat("\nSummary of Results:\n")
+print(results)
+
+```
+
+```{r}
+fits1 <- glmnet(X_train, Y_train, family = "binomial", type.measure = "class", alpha = 1, lambda = lambda_1se)
+
+# Get predicted probabilities
+predictions <- predict(fits1, newx = X_test, type = "class")
+actual_labels <- Y_test
+
+# Manually compute the area under ROC curve
+roc_curve <- roc(actual_labels, as.numeric(predictions))
+
+# ROC curve
+plot(roc_curve, main = "ROC Curve for LASSO", col = "blue", lwd = 2)
+```
+```{r}
+roc_curve$auc
+```
+Lastly, let's fit the polynomial models this way as well
+### Polynomial of degree 3
+```{r}
+
+# Cross-validation
+poly3 <- train(
+  cardio ~ . + poly(ap_hi, 3),                    # Formula
+  data = cardio_cl,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "ROC"            # Appropriate metric for classification
+)
+
+# General results
+poly3$results
+
+# Get predicted probabilities
+predictions <- predict(poly3, newdata = poly3$trainingData, type = "prob")
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- cardio_cl$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve <- roc(actual_labels, predicted_probs)
+
+# ROC curve
+plot(roc_curve, main = "ROC Curve for poly3", col = "blue", lwd = 2)
+```
+```{r}
+roc_curve$auc
+```
+
+### Polynomial of degree 4
+```{r}
+
+# Cross-validation
+poly4 <- train(
+  cardio ~ . + poly(ap_hi, 4),                    # Formula
+  data = cardio_cl,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "ROC"            # Appropriate metric for classification
+)
+
+# General results
+poly4$results
+
+# Get predicted probabilities
+predictions <- predict(poly4, newdata = poly4$trainingData, type = "prob")
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- cardio_cl$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve <- roc(actual_labels, predicted_probs)
+
+# ROC curve
+plot(roc_curve, main = "ROC Curve for poly4", col = "blue", lwd = 2)
+```
+```{r}
+roc_curve$auc
+```
+
+
+
+
 ## References
+
+
+
+
