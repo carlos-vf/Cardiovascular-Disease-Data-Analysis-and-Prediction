@@ -233,28 +233,6 @@ grid.arrange(cl_p3, cardio_pl)
 ```
 A main split persists, but there more clusters in the "border zone" in the middle.
 
-Let's test for mean differences across clusters
-```{r}
-cluster_differences = c()
-for (i in continuous_vars){
-  anova <- aov(cardio[, i] ~ cardio[, "Cluster"])
-  cluster_differences[i] = summary(anova)[[1]][["Pr(>F)"]][1]
-  print(wilcox_test_result$p.value)
-}
-
-for (i in categorical_vars){
-  # Create a contingency table
-  contingency_table <- table(cardio[[i]], cardio$Cluster)
-
-  # Perform the Chi-Square test
-  chi_square_result <- chisq.test(contingency_table)
-  cluster_differences[i] = chi_square_result$p.value
-  print(chi_square_result$p.value)
-}
-
-cluster_differences
-```
-
 ### K-means clustering (only numerical -> 2 clusters)
 ```{r}
 cardio_justnum <- scale(cardio_cl[, continuous_vars])
@@ -314,9 +292,11 @@ grid.arrange(cl_p1, cl_p2)
 ```{r}
 cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
   geom_point() +
-  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+  scale_color_manual(values = c("1" = "blue", "2" = "red")) + # Invert cluster colors
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)", color = "Cluster")
 cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
   geom_point() +
+  scale_color_manual(values = c("0" = "red", "1" = "blue")) + # Invert cluster colors
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 grid.arrange(cl_p3, cardio_pl)
 ```
@@ -325,25 +305,43 @@ ggsave("images/2kmodes_justnum_good.png", width=8, height=6)
 ```
 
 ```{r}
-cluster_differences = c()
-for (i in continuous_vars){
-  anova <- aov(cardio[, i] ~ cardio[, "Cluster"])
-  cluster_differences[i] = summary(anova)[[1]][["Pr(>F)"]][1]
-  print(wilcox_test_result$p.value)
-}
-
-for (i in categorical_vars){
-  # Create a contingency table
-  contingency_table <- table(cardio[[i]], cardio$Cluster)
-
-  # Perform the Chi-Square test
-  chi_square_result <- chisq.test(contingency_table)
-  cluster_differences[i] = chi_square_result$p.value
-  print(chi_square_result$p.value)
-}
-
-cluster_differences
+info_cluster1 = cardio %>% filter(Cluster == 1)
+summary(info_cluster1)
 ```
+```{r}
+info_cluster2 = cardio %>% filter(Cluster == 2)
+summary(info_cluster2)
+```
+```{r}
+# Group the data by Cluster and calculate summary statistics
+cluster_summary <- cardio %>%
+  group_by(Cluster) %>%
+  summarize(
+    Count = n(),
+    disease_incidence = sum(cardio == 1)/n(),
+    active_count = sum(active == "Yes")/n(),
+    high_chol = sum(cholesterol %in% c("above normal", "well above normal"))/n(),
+    gluc = sum(gluc %in% c("above normal", "well above normal"))/n(),
+    Female = sum(gender == "F") / n(), 
+    Male = sum(gender == "M") / n() 
+    # Add more summary statistics as needed
+  )
+
+# Print the summary table
+print(cluster_summary)
+
+
+
+# Save the table as a PNG image
+png("images/cluster_summary.png", width = 600, height = 400) 
+# Convert tibble to a table object
+table <- tableGrob(cluster_summary)
+grid.draw(table)
+dev.off()
+```
+
+One can clearly see how the clusters different in terms of health: there is a very high incidence of cardiovascular disease in the first cluster, which has also predictably higher levels of cholesterol and glucose present in their blood. Gender percentages are almost equal, with slightly more females being in the "healthier" cluster.
+
 ### K-modes clustering (only categorical -> 8 clusters)
 ```{r}
 library(klaR)
@@ -429,6 +427,7 @@ for (i in categorical_vars){
 
 modes_cluster_differences
 ```
+
 
 
 # Further attempt at hierarchical clustering

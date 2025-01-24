@@ -205,7 +205,7 @@ cardio <- cardio[!(cardio$ap_hi < 25 | cardio$ap_hi > 400 | cardio$ap_lo <  10| 
 Dividing age by 365 to obtain it in years:
 
 ```{r}
-cardio$age = ceiling(cardio$age/365)
+cardio$age = floor(cardio$age/365)
 summary(cardio$age)
 ggplot(cardio, aes(y = age)) +
   geom_boxplot(fill = "skyblue", color = "black") + labs(
@@ -222,8 +222,9 @@ There are only 4 observations concerning people < 40 years old, and the youngest
 ### Correlation analysis
 
 
-The heatmap confirms some (perhaps rather intuitive) relationships:\
-- Diastolic and systolic blood pressure are heavily correlated\
+The heatmap confirms some (perhaps rather intuitive) relationships:
+
+- Diastolic and systolic blood pressure are heavily correlated
 - Both weight and age are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.\
 
 ```{r}
@@ -399,17 +400,17 @@ if (!dir.exists("images")) {
 
 save_plots <- function(plot_list){
   # Save each plot to the "images" directory using png() device
-for (plot_name in names(plot_list)) {
-  # Open a PNG device
-  png(filename = paste0("images/", plot_name, ".png"), width = 800, height = 600, res = 300)
-  
-  # Print the plot
-  print(plot_list[[plot_name]])
-  
-  # Close the device
-  dev.off()
-  cat("Plots saved successfully in the 'images' directory.\n")
-}
+  for (plot_name in names(plot_list)) {
+    # Open a PNG device
+    png(filename = paste0("images/", plot_name, ".png"), width = 800, height = 600, res = 300)
+    
+    # Print the plot
+    print(plot_list[[plot_name]])
+    
+    # Close the device
+    dev.off()
+    cat("Plots saved successfully in the 'images' directory.\n")
+  }
 }
 plots_density <- list(
   gdens1 = gdens1,
@@ -485,7 +486,8 @@ ggsave("images/alcohol_gender.png", ag, width = 8, height = 8)
 ggsave("images/agecat.png", acat, width = 8, height = 8)
 ```
 
-Within people having heart disease, high colesterol, glucose and older age people are significantly overrepresented, and to a smaller extent are inactive people. Surprisingly, the percantage of smokers and alcohol consumers is slightly higher for the healthy group, whereas gender doesn't seem to have significant differences.\
+Within people having heart a disease, high cholesterol, glucose and older age people are significantly overrepresented, and to a smaller extent are also inactive people. Surprisingly, the percentage of smokers and alcohol consumers is slightly higher for the healthy group, whereas gender doesn't seem to have significant differences.
+
 We use the Chi-squared test to see to which degree the variables are correlated with cardio:
 
 ```{r}
@@ -515,7 +517,6 @@ We perform t-tests for binary variables, and ANOVA tests for groups of more than
 
 ```{r}
 continuous_vars = c("ap_hi", "ap_lo", "weight", "height", "age")
-# continuous_vars = c("ap_hi", "ap_lo")
 
 test_mean_diff = function(continuous_vars, categorical_vars){
   mean_diff_results <- data.frame(
@@ -599,7 +600,7 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 ```
 
-**While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` above normal or well above normal seem to be particularly frequent along with the occurrence of heart diseases.**
+While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` *above normal* or *well above normal* seem to be particularly frequent along with the occurrence of heart diseases.
 
 ```{r barplots2}
 #Cholesterol
@@ -723,6 +724,8 @@ ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8
 ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
 ```
 
+## Random Forest
+
 ### Classification trees
 
 In order to correctly fit the random forest model, let's analyze first some simpler classifiers: classification trees. 
@@ -730,7 +733,7 @@ In order to correctly fit the random forest model, let's analyze first some simp
 Firstly proposed by [@breiman1984classification], decision trees (or classification trees, when dealing with a discrete target variable) are unsupervised learning algorithms. The idea consists on recursively partition the feature space and assign a label to each resulting partition. The tree is then used to classify future points according to these splits and labels. The key advantage of decision trees over other methods is their high interpretability, a quality usually wanted when working in fields like healthcare [@bertsimas2017optimal].
 
 The dataset will be split in two parts: 80% for training the model and 20% for validation. 
-## TRAIN TEST SPLIT
+
 ```{r classification trees (high cp) 1}
 # Split data (train/test)
 set.seed(123)
@@ -751,7 +754,13 @@ Now, it is time to fit the model. The function `rpart`, expects some user-define
 # Build and plot the classification tree
 tree <- rpart(cardio ~ ., data = train_data, method = "class")
 tree$control
+
 rpart.plot(tree)
+
+# Save image
+png("images/high_cp_tree_plot.png", width = 800, height = 600)
+rpart.plot(tree)
+dev.off()
 ```
 
 At first sight, we can observe that the classification tree completely relies on the feature `ap_hi` for the only split. Let's check the importance of the different features in the model:
@@ -787,6 +796,11 @@ plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 # AUC
 auc_value <- auc(roc_curve)
 print(paste("AUC:", round(auc_value, 4)))
+
+# Save image
+png("images/high_cp_roc_curve.png", width = 800, height = 600)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+dev.off()
 ```
 
 Could we improve the performance of the model with more splits? In order to force the tree to use less relevant features, we will readjust the complexity parameter (`cp`).
@@ -796,6 +810,11 @@ Could we improve the performance of the model with more splits? In order to forc
 tree <- rpart(cardio ~ ., data = train_data, method = "class",
               control = rpart.control(cp = 0.001))
 rpart.plot(tree)
+
+# Save image
+png("images/low_cp_tree_plot.png", width = 800, height = 600)
+rpart.plot(tree)
+dev.off()
 ```
 
 This time a much complex tree is created, taking into account all the features. All variables have now some importance in the model (even though the differences among them can be huge).
@@ -829,9 +848,14 @@ plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 # AUC
 auc_value <- auc(roc_curve)
 print(paste("AUC:", round(auc_value, 4)))
+
+# Save image
+png("images/low_cp_roc_curve.png", width = 800, height = 600)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+dev.off()
 ```
 
-After evaluating both models, we get a sightly better accuracy from a significantly more complex tree. Moreover, the area under the ROC curve also increases (from 0.7056 to 0.7770). From this comparison, we can conclude that although the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases, observing other variables like cholesterol, weight, age or glucose also helps to identify them.
+After evaluating both models, we get a sightly better accuracy from a significantly more complex tree. Moreover, the area under the ROC curve also increases. From this comparison, we can conclude that although the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases, observing other variables like cholesterol, weight, age or glucose also helps to identify them.
 
 
 ### Random Forest model
@@ -930,6 +954,11 @@ roc_curve <- roc(actual_labels, predicted_probs)
 
 # ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+
+# Save image
+png("images/rf_roc_curve.png", width = 800, height = 600)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+dev.off()
 ```
 
 ```{r rf_model_confusion_matrix}
@@ -941,6 +970,7 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 cm_table <- as.data.frame(cm$table)
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
+<<<<<<< HEAD
 # Use the train() function correctly
 log_model_all <- train(
   cardio ~ .,                    # Formula
@@ -977,11 +1007,20 @@ confusion_df <- as.data.frame(conf_matrix$table)
 ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
 # Plot the confusion matrix
 ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+=======
+# Plot the confusion matrix
+rf_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
   labs(title = "Confusion Matrix: Random Forest", x = "Actual", y = "Predicted")
+<<<<<<< HEAD
+=======
+ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height = 8)
+rf_confusion_matrix
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```
 
 ```{r rf_model_other_metrics}
@@ -1012,7 +1051,12 @@ print(metrics_df)
 
 As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
+<<<<<<< HEAD
 ## Logistic Regression Model
+=======
+
+## Logistic Regression
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```{r}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
 
@@ -1046,6 +1090,14 @@ roc_curve <- roc(actual_labels, predicted_probs)
 
 # ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+<<<<<<< HEAD
+=======
+
+# Save image
+png("images/lr_roc_curve.png", width = 800, height = 600)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+dev.off()
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```
 
 There are several seemingly weird effects in this model:
@@ -1061,12 +1113,21 @@ cm_table <- as.data.frame(cm$table)
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
+<<<<<<< HEAD
 ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+=======
+lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
   labs(title = "Confusion Matrix: Logistic Regression", x = "Actual", y = "Predicted")
+<<<<<<< HEAD
+=======
+ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
+lr_confusion_matrix
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```
 
 ```{r lg_model_other_metrics}
@@ -1107,12 +1168,18 @@ importance_lr <- importance_lr[importance_lr$Feature != "(Intercept)", ]
 colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Feature")
 
 # Plot feature importance
+<<<<<<< HEAD
 ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
+=======
+feature_importance <- ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
   labs(title="Feature Importance - Logistic Regression",
        x="Feature", y="Importance (Coefficient Absolute Value)") +
   theme_minimal()
+ggsave("images/feature_importance.png", feature_importance, width = 8, height = 8)
+feature_importance
 ```
 We plot the absolute magnitude of every variable. The results are puzzling: cholesterol has very high importance, while pressure measurements matter much less than expected.
 We hypothesize that this could be due to some sort of "correspondence" or "multicollinearity" between some variables:
@@ -1142,7 +1209,7 @@ summary(interaction_gluc_cardio)
 ```
 The weird effect is present just on levels of `gluc` above normal when they interact with high cholesterol. Taken individually, when they are significant, they contribute positively to the insurgence of heart diseases, as expected.  
 
-## Combining pressures
+### Combining pressures
 We create a new variable that combines the pressure measurements: `ap_hu` is the difference between `ap_lo` and `ap_hi`.
 ```{r}
 cardio$ap_pu = cardio$ap_hi - cardio$ap_lo
@@ -1159,6 +1226,7 @@ print(log_model_ap_pu)
 ```
 
 
+<<<<<<< HEAD
 
 ## Model diagnostics
 
@@ -1405,3 +1473,95 @@ roc_curve$auc
 
 
 
+=======
+## Other models
+We consider the square of age, as as one gets older health is more fragile.
+```{r}
+age_sq = glm(cardio ~ . - ap_pu + poly(age, degree = 2), data = cardio, family = binomial(link = "logit") )
+summary(age_sq)
+age_sq$aic
+```
+
+### Interaction model
+```{r}
+model_int = glm(cardio ~ . -ap_lo -ap_hi + cholesterol*gluc, data = cardio, family = binomial(link = "logit"))
+summary(model_int)
+```
+### Model diagnostics
+```{r}
+model_all = glm(cardio ~ . - ap_pu, data = cardio, family = binomial(link = "logit"))
+summary(model_all)
+print(model_all$aic)
+
+
+library(car)
+vif_values = vif(model_all)
+vif_values
+```
+Apparently there is no multicollinearity.
+
+Let's check the residual plots
+```{r}
+
+fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
+
+pred <- predict(fit, type = "response")
+res <- residuals(fit, type = "response")
+plot(c(0, 1), c(-1, 1), xlab = "Estimated Pr(Switching)", type = "n",
+     ylab = "Observed - Estimated", main = "Residual Plot")
+abline(h = 0, col = "gray", lwd = 0.5)
+points(pred, res, pch = 20, cex = 0.2)
+abline(c(0, -1), col = "red", lwd = 0.25)
+abline(c(1, -1), col = "red", lwd = 0.25)
+
+binned.resids <- function(x, y, nclass = sqrt(length(x))){
+  breaks.index <- floor(length(x) * (1 : (nclass))/nclass)
+  breaks <- c(-Inf, sort(x)[breaks.index], Inf)
+  output <- xbreaks <- NULL
+  x.binned <- as.numeric(cut(x, breaks))
+  for(i in 1:nclass){
+    items <- (1:length(x))[x.binned == i]
+    x.range <- range(x[items])
+    xbar <- mean(x[items])
+    ybar <- mean(y[items])
+    n <- length(items)
+    sdev <- sd(y[items])
+    output <- rbind(output, c(xbar, ybar, n, x.range, 2 * sdev/sqrt(n)))
+  }
+  colnames(output) <- c("xbar", "ybar", "n", "x.lo", "x.hi", "2se")
+  return(list(binned = output, xbreaks = xbreaks))
+}
+
+br <- binned.resids(pred, res, nclass = 50)$binned
+plot(range(br[,1]), range(br[,2],br[,6], -br[,6]), type = "n",
+     xlab = "Estimated Pr(Switching)", ylab = "Average residual", main = "Binned Residual Plot")
+abline(h = 0, col = "gray", lwd = 0.5); points(br[,1], br[,2], pch = 19, cex = 0.5)
+lines(br[,1], br[,6], col = "gray", lwd = 0.5); lines(br[,1], -br[,6], col = "gray", lwd = 0.5)
+
+```
+!!! THE RESIDUALS ARE DEFINITELY FOLLOWING A PATTERN
+
+Let's check with the individual variables (not working)
+```{r, eval=FALSE}
+par(mfrow = c(1, 2))
+br.ap_hi <- binned.resids(cardio$ap_hi, res,
+                         nclass = 40)$binned
+plot(range(br.ap_hi[,1]), range(br.ap_hi[,2], br.ap_hi[,6], -br.ap_hi[,6]), type = "n",
+     xlab = "Distance", ylab = "Average residual", main = "Binned residual plot")
+abline(h = 0, col = "gray", lwd = 0.5)
+lines(br.ap_hi[,1], br.ap_hi[,6], col = "gray", lwd = 0.5)
+lines(br.ap_hi[,1], -br.ap_hi[,6], col = "gray", lwd = 0.5)
+points(br.ap_hi[,1], br.ap_hi[,2], pch = 19, cex = 0.5)
+
+br.ap_lo <- binned.resids(cardio$ap_lo, res,
+                            nclass = 40)$binned
+plot(range(br.ap_lo[,1]), range(br.ap_lo[,2], br.ap_lo[,6], -br.ap_lo[,6]), type = "n",
+     xlab = "Arsenic concentration", ylab = "Average residual", main = "Binned residual plot")
+abline(h = 0, col = "gray", lwd = 0.5)
+lines(br.ap_lo[,1], br.ap_lo[,6], col = "gray", lwd = 0.5)
+lines(br.ap_lo[,1], -br.ap_lo[,6], col = "gray", lwd = 0.5)
+points(br.ap_lo[,1], br.ap_lo[,2], pch = 19, cex = 0.5)
+
+```
+## References
+>>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
