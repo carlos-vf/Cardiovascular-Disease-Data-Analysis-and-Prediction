@@ -950,14 +950,14 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- cardio_cl$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_rf <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_rf, main = "ROC Curve", col = "blue", lwd = 2)
 
 # Save image
 png("images/rf_roc_curve.png", width = 800, height = 600)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_rf, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
 ```
 
@@ -1012,7 +1012,7 @@ As we could imagine, this enhanced version of classification trees gets a better
 
 ## Logistic Regression
 
-### Complete Model
+### Basic Model
 
 ```{r}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
@@ -1091,14 +1091,14 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- cardio_cl$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_lr <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_lr, main = "ROC Curve", col = "blue", lwd = 2)
 
 # Save image
 png("images/lr_roc_curve.png", width = 800, height = 600)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_lr, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
 ```
 
@@ -1166,8 +1166,8 @@ colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Featur
 feature_importance <- ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
-  labs(title="Feature Importance - Logistic Regression",
-       x="Feature", y="Importance (Coefficient Absolute Value)") +
+  labs(title="Coefficient Value - Logistic Regression",
+       x="Feature", y="Value)") +
   theme_minimal()
 ggsave("images/feature_importance.png", feature_importance, width = 8, height = 8)
 feature_importance
@@ -1420,13 +1420,13 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- cardio_cl$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_poly3 <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve for poly3", col = "blue", lwd = 2)
+plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
 ```
 ```{r}
-roc_curve$auc
+roc_curve_poly3$auc
 ```
 
 ### Polynomial of degree 4
@@ -1451,15 +1451,56 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- cardio_cl$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_poly4 <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve for poly4", col = "blue", lwd = 2)
+plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
 ```
 ```{r}
-roc_curve$auc
+roc_curve_poly4$auc
 ```
 
+
+
+## Results
+
+Let's compare the results:
+```{r}
+# Plot the ROC curves
+plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
+plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
+plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
+plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
+
+# Add a legend
+legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "Polynomial Regression 3",  "Polynomial Regression 4"), col = c("red", "blue", "green", "orange"), lwd = 2)
+
+# Model results
+results <- data.frame(
+  Model = c("Random Forest", "Basic Logistic Regression", "Polynomial Regression 3", "Polynomial Regression 4"),
+  AUC = c(
+    rf_model$results$ROC,
+    log_model$results$ROC,
+    poly3$results$ROC,
+    poly4$results$ROC
+  ),
+  Sensitivity = c(
+    rf_model$results$Sens,
+    log_model$results$Sens,
+    poly3$results$Sens,
+    poly4$results$Sens
+  ),
+  Specificity = c(
+    rf_model$results$Spec,
+    log_model$results$Spec,
+    poly3$results$Spec,
+    poly4$results$Spec
+  )
+)
+print(results)
+```
+
+As it is shown above, the four main models get similar results in the task of classifying the data, all of them with an area under the ROC curve in the range [0.79 - 0.80]. Despite its slightly better performance, the lack of explainability makes the random forest a less suitable model for this context, leaving the logistic regressions as the best choices. 
 
 
 ## References
