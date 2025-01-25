@@ -723,6 +723,203 @@ ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
 ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
 ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
 ```
+## Cluster analysis
+We proceed by performing cluster analysis. Due to the nature of data, and various experiments with the results, we considered 2 different approaches:
+- considering all the variables, but scaling just the numerical ones.
+- scaling and considering just numerical variables.
+### K-means clustering (scale only numerical)
+```{r}
+# Filter the dataset to exclude these columns and scale the remaining numeric columns
+cardio_scaled_onlynums = cardio_cl
+cardio_scaled_onlynums[, c(continuous_vars)] = scale(cardio_scaled_onlynums[, c(continuous_vars)])
+
+# View the first few rows of the dataset
+head(cardio_scaled_onlynums)
+```
+
+```{r}
+# Compute the distance matrix for the scaled data
+sample_cardio_onlynums = sample(as.matrix(cardio_scaled_onlynums), 10000)
+dist_matrix <- dist(sample_cardio_onlynums)
+```
+
+
+```{r}
+# Perform K-means clustering
+set.seed(123)  
+silhouette_scores_onlynum = c()
+
+# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
+# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
+ for (n_clusters in 2:10) {
+   # Perform k-means clustering
+   kmeans_result <- kmeans(sample_cardio_onlynums, centers = n_clusters)
+
+   # Extract cluster labels from the k-means result
+   cluster_labels <- kmeans_result$cluster
+
+   # Calculate silhouette values
+   sil <- silhouette(cluster_labels, dist_matrix)
+
+   # Store the average silhouette score for the current number of clusters
+   silhouette_scores_onlynum[n_clusters] <- mean(sil[, 3])
+ }
+
+max_silhouette_kmeans_onlynum = which.max(silhouette_scores_onlynum)
+
+best_kmeans_result_onlynum <- kmeans(cardio_cl, centers = max_silhouette_kmeans_onlynum)
+# Add the cluster assignment to the original data
+cardio$Cluster_ON <- as.factor(best_kmeans_result_onlynum$cluster)
+table(cardio$Cluster_ON)
+```
+
+```{r}
+# Visualize the clusters across different dimensions
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster_ON)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster_ON)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+
+grid.arrange(cl_p1, cl_p2)
+```
+
+```{r}
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster_ON)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+grid.arrange(cl_p3, cardio_pl)
+```
+There is a split, but a lot of clusters overlap for central values.
+```{r}
+cluster_summary_ON <- cardio %>%
+  group_by(Cluster_ON) %>%
+  summarize(
+    Count = n(),
+    disease_incidence = sum(cardio == 1)/n(),
+    active_count = sum(active == "Yes")/n(),
+    high_chol = sum(cholesterol %in% c("above normal", "well above normal"))/n(),
+    gluc = sum(gluc %in% c("above normal", "well above normal"))/n(),
+    ap_hi = mean(ap_hi),
+    ap_lo = mean(ap_lo),
+    Female = sum(gender == "F") / n(), 
+    Male = sum(gender == "M") / n() 
+    # Add more summary statistics as needed
+  )
+cluster_summary_ON
+```
+
+### K-means clustering (only numerical)
+```{r}
+cardio_justnum <- scale(cardio_cl[, continuous_vars])
+
+# View the first few rows of the dataset
+head(cardio_justnum)
+```
+
+```{r}
+# Compute the distance matrix for the scaled data
+sample_justnum = sample(cardio_justnum, 10000)
+dist_matrix_justnum <- dist(sample_justnum)
+head(dist_matrix_justnum)
+```
+
+```{r}
+# Perform K-means clustering
+set.seed(123)  
+silhouette_scores_justnum = c()
+
+# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
+# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
+ for (n_clusters in 2:10) {
+   # Perform k-means clustering
+   kmeans_result <- kmeans(sample_justnum, centers = n_clusters)
+
+   # Extract cluster labels from the k-means result
+   cluster_labels <- kmeans_result$cluster
+
+   # Calculate silhouette values
+   sil <- silhouette(cluster_labels, dist_matrix)
+
+   # Store the average silhouette score for the current number of clusters
+   silhouette_scores_justnum[n_clusters] <- mean(sil[, 3])
+ }
+
+max_silhouette_kmeans_justnum = which.max(silhouette_scores_justnum)
+
+best_kmeans_result_justnum <- kmeans(cardio_justnum, centers = max_silhouette_kmeans_justnum)
+# Add the cluster assignment to the original data
+cardio$Cluster <- as.factor(best_kmeans_result_justnum$cluster)
+table(cardio$Cluster)
+```
+
+```{r}
+# Visualize the clusters across different dimensions
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+
+grid.arrange(cl_p1, cl_p2)
+```
+
+```{r}
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+  geom_point() +
+  scale_color_manual(values = c("1" = "blue", "2" = "red")) + # Invert cluster colors
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)", color = "Cluster")
+cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
+  geom_point() +
+  scale_color_manual(values = c("0" = "red", "1" = "blue")) + # Invert cluster colors
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+grid.arrange(cl_p3, cardio_pl)
+```
+```{r}
+ggsave("images/2kmodes_justnum_good.png", width=8, height=6)
+```
+
+```{r}
+info_cluster1 = cardio %>% filter(Cluster == 1)
+summary(info_cluster1)
+```
+```{r}
+info_cluster2 = cardio %>% filter(Cluster == 2)
+summary(info_cluster2)
+```
+```{r}
+# Group the data by Cluster and calculate summary statistics
+cluster_summary <- cardio %>%
+  group_by(Cluster) %>%
+  summarize(
+    Count = n(),
+    disease_incidence = sum(cardio == 1)/n(),
+    active_count = sum(active == "Yes")/n(),
+    high_chol = sum(cholesterol %in% c("above normal", "well above normal"))/n(),
+    gluc = sum(gluc %in% c("above normal", "well above normal"))/n(),
+    Female = sum(gender == "F") / n(), 
+    Male = sum(gender == "M") / n(),
+    ap_hi = mean(ap_hi),
+    ap_lo = mean(ap_lo),
+    # Add more summary statistics as needed
+  )
+
+# Print the summary table
+print(cluster_summary)
+```
+
+Now one can clearly see how the clusters different in terms of health: there is a very high incidence of cardiovascular disease in the first cluster, which has also predictably higher levels of cholesterol and glucose present in their blood. Gender percentages are almost equal, with slightly more females being in the "healthier" cluster. Pressures also differ across the two, with $\approx 25$ points difference for systolic and $\approx 14$ for diastolic blood pressure. 
+
+```{r remove cluster labels}
+cardio$Cluster <- NULL
+cardio$Cluster_ON <- NULL
+```
+
 
 ## Random Forest
 
