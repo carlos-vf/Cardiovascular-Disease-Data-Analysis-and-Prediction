@@ -143,6 +143,7 @@ invisible(lapply(packages, install_if_missing))
 
 ## Importing libraries
 ```{r libraries}
+suppressMessages(library(arm))
 suppressMessages(library(caret))
 suppressMessages(library(cluster))
 suppressMessages(library(corrplot))
@@ -151,9 +152,10 @@ suppressMessages(library(doParallel))
 suppressMessages(library(dplyr))
 suppressMessages(library(GGally))
 suppressMessages(library(ggplot2))
+suppressMessages(library(glmnet))
 suppressMessages(library(gridExtra))
-suppressMessages(library(patchwork))
 suppressMessages(library(parallel))
+suppressMessages(library(patchwork))
 suppressMessages(library(pROC))
 suppressMessages(library(ranger))
 suppressMessages(library(reshape2))
@@ -536,7 +538,6 @@ test_mean_diff = function(continuous_vars, categorical_vars){
       test_type = "t-test"
     } else {
       # Perform ANOVA
-      # browser()
       anova_test = aov(cardio[, cont_var] ~ cardio[, cat_var])
       p_value = summary(anova_test)[[1]][["Pr(>F)"]][1]
       p_value = 0.0001
@@ -557,7 +558,6 @@ return(mean_diff_results)
 
 # View results
 result = test_mean_diff(continuous_vars, categorical_vars)
-# result = result %>% drop_na()
 print(result)
 ```
 
@@ -858,7 +858,7 @@ dev.off()
 After evaluating both models, we get a sightly better accuracy from a significantly more complex tree. Moreover, the area under the ROC curve also increases. From this comparison, we can conclude that although the blood pressure is one the best indicators (in this dataset) of cardiovascular diseases, observing other variables like cholesterol, weight, age or glucose also helps to identify them.
 
 
-### Random Forest model
+### Model
 
 Following classification trees, a natural approximation is fitting a random forest model. 
 
@@ -970,57 +970,15 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 cm_table <- as.data.frame(cm$table)
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
-<<<<<<< HEAD
-# Use the train() function correctly
-log_model_all <- train(
-  cardio ~ .,                    # Formula
-  data = cardio,             # Dataset
-  method = "glm",                # Correct method for logistic regression
-  family = binomial(link = "logit"),  # Logistic regression
-  trControl = ctrl,              # Cross-validation settings
-  metric = "Accuracy"            # Appropriate metric for classification
-)
-
-# Print and summarize the model
-print(log_model_all)
-```
-```{r}
-summary(log_model_all)
-```
-There are several seemingly weird effects in this model:
-- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
-```{r}
-## Model Predictions
-log_pred <- predict(log_model, newdata = test_data, type = 'response')
-log_pred_class <- factor(ifelse(log_pred > 0.5, "1", "0"))
-
-# Model Evaluation
-
-## Confusion Matrix for Logistic Regression
-
-conf_matrix <- confusionMatrix(log_pred_class, test_data$cardio)
-print(conf_matrix)
-
-## Confusion Matrix Visualization
-
-confusion_df <- as.data.frame(conf_matrix$table)
-ggplot(confusion_df, aes(Reference, Prediction, fill=Freq)) +
-# Plot the confusion matrix
-ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
-=======
 # Plot the confusion matrix
 rf_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
   labs(title = "Confusion Matrix: Random Forest", x = "Actual", y = "Predicted")
-<<<<<<< HEAD
-=======
 ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height = 8)
 rf_confusion_matrix
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```
 
 ```{r rf_model_other_metrics}
@@ -1051,12 +1009,11 @@ print(metrics_df)
 
 As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
 
-<<<<<<< HEAD
-## Logistic Regression Model
-=======
 
 ## Logistic Regression
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
+
+### Complete Model
+
 ```{r}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
 
@@ -1074,6 +1031,54 @@ log_model <- train(
 print(log_model)
 ```
 
+```{r lr_decision_boundaries}
+# Generate grid of unique ap_hi and ap_lo values
+grid <- expand.grid(
+  ap_hi = seq(min(cardio_cl$ap_hi), max(cardio_cl$ap_hi), length.out = 200),
+  ap_lo = seq(min(cardio_cl$ap_lo), max(cardio_cl$ap_lo), length.out = 200)
+)
+
+other_predictors <- cardio_cl %>%
+  select(-c(ap_hi, ap_lo, cardio)) %>%
+  summarise(across(everything(), median))
+grid <- cbind(grid, other_predictors[rep(1, nrow(grid)), ])
+
+# Predict probabilities using the model
+probabilities <- predict(log_model, newdata = grid, type = "prob")
+
+# Extract probabilities for the positive class
+grid$predicted_probs <- probabilities[, 2]
+
+
+# Use the grid for contour and tile layers
+decision_boundary <- ggplot() +
+  # Decision boundary
+  geom_contour(data = grid, aes(x = ap_hi, y = ap_lo, z = predicted_probs), breaks = 0.5, color = "black", linetype = "solid", size = 1) +
+  
+  # Filled contour plot
+  geom_tile(data = grid, aes(x = ap_hi, y = ap_lo, fill = predicted_probs), alpha = 0.8) +
+  scale_fill_gradient(low = "#FFCCCC", high = "#6699FF", name = "P(cardio=1)") +
+  
+  # Original data points
+  geom_point(data = cardio_cl, aes(x = ap_hi, y = ap_lo, color = as.factor(cardio)), linewidth = 2.5) +
+  scale_color_manual(values = c("No" = "#33FF57", "Yes" = "#FF5733"), name = "Cardio") +
+  
+  # Titles and themes
+  labs(
+    title = "Logistic Regression Decision Boundary",
+    x = "Systolic Blood Pressure (ap_hi)", y = "Diastolic Blood Pressure (ap_lo)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "right"
+  )
+
+ggsave("images/decision_boundary.png", decision_boundary, width = 8, height = 8)
+decision_boundary
+```
+
+
 ### Performance
 
 ```{r log_model_performance}
@@ -1090,14 +1095,11 @@ roc_curve <- roc(actual_labels, predicted_probs)
 
 # ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
-<<<<<<< HEAD
-=======
 
 # Save image
 png("images/lr_roc_curve.png", width = 800, height = 600)
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```
 
 There are several seemingly weird effects in this model:
@@ -1113,21 +1115,14 @@ cm_table <- as.data.frame(cm$table)
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
-<<<<<<< HEAD
-ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
-=======
 lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
   labs(title = "Confusion Matrix: Logistic Regression", x = "Actual", y = "Predicted")
-<<<<<<< HEAD
-=======
 ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
 lr_confusion_matrix
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
 ```
 
 ```{r lg_model_other_metrics}
@@ -1168,11 +1163,7 @@ importance_lr <- importance_lr[importance_lr$Feature != "(Intercept)", ]
 colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Feature")
 
 # Plot feature importance
-<<<<<<< HEAD
-ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
-=======
 feature_importance <- ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
   labs(title="Feature Importance - Logistic Regression",
@@ -1181,6 +1172,7 @@ feature_importance <- ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=
 ggsave("images/feature_importance.png", feature_importance, width = 8, height = 8)
 feature_importance
 ```
+
 We plot the absolute magnitude of every variable. The results are puzzling: cholesterol has very high importance, while pressure measurements matter much less than expected.
 We hypothesize that this could be due to some sort of "correspondence" or "multicollinearity" between some variables:
 - `gluc` and `cholesterol`
@@ -1188,7 +1180,8 @@ We hypothesize that this could be due to some sort of "correspondence" or "multi
 
 Let's now further investigate the relationship between some of the variables and heart disease
 
-### Smoke
+
+### Smoke & Alcohol Model
 ```{r}
 smoke_check = glm(cardio ~ smoke + alco, data = train_data, family = binomial(link = "logit") )
 summary(smoke_check)
@@ -1197,7 +1190,7 @@ Even if taken as the single predictor, it still counterintuitively contributes n
 In the data exploration part, we saw that there were, numerically, minimal differences between groups with regard do this variable. 
 Furthermore both of these variables are *subjective*, meaning that the answer was at the respondent's discretion. This means one could straight up lie, or even, having quit recently, answer *no* even though the effects of alcohol consumption or smoking were already present. 
 
-### Glucose
+### Glucose & Cholesterol Model
 ```{r}
 gluc_check = glm(cardio ~ gluc + cholesterol, data = train_data, family = binomial(link = "logit"))
 summary(gluc_check)
@@ -1209,8 +1202,8 @@ summary(interaction_gluc_cardio)
 ```
 The weird effect is present just on levels of `gluc` above normal when they interact with high cholesterol. Taken individually, when they are significant, they contribute positively to the insurgence of heart diseases, as expected.  
 
-### Combining pressures
-We create a new variable that combines the pressure measurements: `ap_hu` is the difference between `ap_lo` and `ap_hi`.
+### Pulse Pressure Model
+We create a new variable, named *pulse pressure*, that combines the pressure measurements. $ap\_pu = ap\_hi - ap\_lo$.
 ```{r}
 cardio$ap_pu = cardio$ap_hi - cardio$ap_lo
 log_model_ap_pu <- train(
@@ -1226,12 +1219,11 @@ print(log_model_ap_pu)
 ```
 
 
-<<<<<<< HEAD
 
-## Model diagnostics
+### Model diagnostics
 
 Let's check the residual plots
-```{r original_residuals}
+```{r original_residuals 1}
 fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
 pred <- predict(fit, type = "response")
 res <- residuals(fit, type = "response")
@@ -1239,14 +1231,16 @@ res <- residuals(fit, type = "response")
 pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit$fitted.values*(1 - fit$fitted.values))
 plot(cardio$ap_hi, pearson_residuals)
 ```
-This graph shows *Pearson residuals*, which are the equivalent of standardized residuals for GLMs. 
-We can see that they are larger at the extremes: they correspond to the points we previously pointed out in the scatter plot, which represent either individuals with low blood pressure which present heart disease, or those with high blood pressure which donàt have any disease. 
 
-```{r original_residuals}
+This graph shows *Pearson residuals*, which are the equivalent of standardized residuals for GLMs.
+
+We can see that they are larger at the extremes. They correspond to the points we previously pointed out in the scatter plot, which represent either individuals with low blood pressure who present a heart disease, or those with high blood pressure who don't have any disease. 
+
+```{r original_residuals 2}
 binnedplot(pred,res, nclass = 1000)
 ```
-Let's see if a polynomial regression can improve the model's fit
 
+Let's see if a polynomial regression can improve the model's fit:
 
 ```{r}
 fit_poly3 <- glm(cardio ~ .+poly(ap_hi, 3), data = cardio, family = binomial(link = "logit"))
@@ -1259,6 +1253,7 @@ plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
 
 binnedplot(pred,res, nclass = 1000)
 ```
+
 ```{r}
 fit_poly4 <- glm(cardio ~ .+poly(ap_hi, 4), data = cardio, family = binomial(link = "logit"))
 
@@ -1272,9 +1267,9 @@ binnedplot(pred,res, nclass = 1000)
 br <- arm::binned.resids(pred,res)
 ```
 
-It's possible to see that by considering the polynomials of systolic blood pressure, the residuals follow less of a pattern. Further factors (like higher polynomials and multiple interactions) were also considered but they did not contribute to improving the model. 
+It's possible to see that by considering the polynomials of the systolic blood pressure, the residuals follow less of a pattern. Further factors (like higher polynomials and multiple interactions) were also considered but they did not contribute to improving the model. 
 
-We still get strange values for some coefficients (e.g gluc).
+We still get strange values for some coefficients (e.g. `gluc`).
 We apply LASSO regression to see what coefficients are actually important.
 ```{r}
 set.seed(23)
@@ -1296,7 +1291,7 @@ plot(cvfit)
 ```{r}
 print(cvfit)
 ```
-By using a $\lambda$ which produces a misclassification error within 1 standard error from the minimum's, we obtain similar results ì, while also simplifying the model: those problematic coefficients from before are shrunk to 0, underlying their secondary importance in determining the presence of heart disease. This is indeed consistent with what we had supposed in our initial exploration of the data. 
+By using a $\lambda$ which produces a misclassification error within 1 standard error from the minimum's, we obtain similar results, while also simplifying the model: those problematic coefficients from before are shrunk to 0, underlying their secondary importance in determining the presence of heart disease. This is indeed consistent with what we had supposed in our initial exploration of the data. 
 
 ```{r}
 # Get optimal lambda values
@@ -1381,9 +1376,8 @@ results <- data.frame(
   )
 )
 
-cat("\nSummary of Results:\n")
-print(results)
-
+print("Summary of Results:")
+results
 ```
 
 ```{r}
@@ -1402,10 +1396,11 @@ plot(roc_curve, main = "ROC Curve for LASSO", col = "blue", lwd = 2)
 ```{r}
 roc_curve$auc
 ```
+
 Lastly, let's fit the polynomial models this way as well
+
 ### Polynomial of degree 3
 ```{r}
-
 # Cross-validation
 poly3 <- train(
   cardio ~ . + poly(ap_hi, 3),                    # Formula
@@ -1467,101 +1462,5 @@ roc_curve$auc
 
 
 
-
 ## References
 
-
-
-
-=======
-## Other models
-We consider the square of age, as as one gets older health is more fragile.
-```{r}
-age_sq = glm(cardio ~ . - ap_pu + poly(age, degree = 2), data = cardio, family = binomial(link = "logit") )
-summary(age_sq)
-age_sq$aic
-```
-
-### Interaction model
-```{r}
-model_int = glm(cardio ~ . -ap_lo -ap_hi + cholesterol*gluc, data = cardio, family = binomial(link = "logit"))
-summary(model_int)
-```
-### Model diagnostics
-```{r}
-model_all = glm(cardio ~ . - ap_pu, data = cardio, family = binomial(link = "logit"))
-summary(model_all)
-print(model_all$aic)
-
-
-library(car)
-vif_values = vif(model_all)
-vif_values
-```
-Apparently there is no multicollinearity.
-
-Let's check the residual plots
-```{r}
-
-fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
-
-pred <- predict(fit, type = "response")
-res <- residuals(fit, type = "response")
-plot(c(0, 1), c(-1, 1), xlab = "Estimated Pr(Switching)", type = "n",
-     ylab = "Observed - Estimated", main = "Residual Plot")
-abline(h = 0, col = "gray", lwd = 0.5)
-points(pred, res, pch = 20, cex = 0.2)
-abline(c(0, -1), col = "red", lwd = 0.25)
-abline(c(1, -1), col = "red", lwd = 0.25)
-
-binned.resids <- function(x, y, nclass = sqrt(length(x))){
-  breaks.index <- floor(length(x) * (1 : (nclass))/nclass)
-  breaks <- c(-Inf, sort(x)[breaks.index], Inf)
-  output <- xbreaks <- NULL
-  x.binned <- as.numeric(cut(x, breaks))
-  for(i in 1:nclass){
-    items <- (1:length(x))[x.binned == i]
-    x.range <- range(x[items])
-    xbar <- mean(x[items])
-    ybar <- mean(y[items])
-    n <- length(items)
-    sdev <- sd(y[items])
-    output <- rbind(output, c(xbar, ybar, n, x.range, 2 * sdev/sqrt(n)))
-  }
-  colnames(output) <- c("xbar", "ybar", "n", "x.lo", "x.hi", "2se")
-  return(list(binned = output, xbreaks = xbreaks))
-}
-
-br <- binned.resids(pred, res, nclass = 50)$binned
-plot(range(br[,1]), range(br[,2],br[,6], -br[,6]), type = "n",
-     xlab = "Estimated Pr(Switching)", ylab = "Average residual", main = "Binned Residual Plot")
-abline(h = 0, col = "gray", lwd = 0.5); points(br[,1], br[,2], pch = 19, cex = 0.5)
-lines(br[,1], br[,6], col = "gray", lwd = 0.5); lines(br[,1], -br[,6], col = "gray", lwd = 0.5)
-
-```
-!!! THE RESIDUALS ARE DEFINITELY FOLLOWING A PATTERN
-
-Let's check with the individual variables (not working)
-```{r, eval=FALSE}
-par(mfrow = c(1, 2))
-br.ap_hi <- binned.resids(cardio$ap_hi, res,
-                         nclass = 40)$binned
-plot(range(br.ap_hi[,1]), range(br.ap_hi[,2], br.ap_hi[,6], -br.ap_hi[,6]), type = "n",
-     xlab = "Distance", ylab = "Average residual", main = "Binned residual plot")
-abline(h = 0, col = "gray", lwd = 0.5)
-lines(br.ap_hi[,1], br.ap_hi[,6], col = "gray", lwd = 0.5)
-lines(br.ap_hi[,1], -br.ap_hi[,6], col = "gray", lwd = 0.5)
-points(br.ap_hi[,1], br.ap_hi[,2], pch = 19, cex = 0.5)
-
-br.ap_lo <- binned.resids(cardio$ap_lo, res,
-                            nclass = 40)$binned
-plot(range(br.ap_lo[,1]), range(br.ap_lo[,2], br.ap_lo[,6], -br.ap_lo[,6]), type = "n",
-     xlab = "Arsenic concentration", ylab = "Average residual", main = "Binned residual plot")
-abline(h = 0, col = "gray", lwd = 0.5)
-lines(br.ap_lo[,1], br.ap_lo[,6], col = "gray", lwd = 0.5)
-lines(br.ap_lo[,1], -br.ap_lo[,6], col = "gray", lwd = 0.5)
-points(br.ap_lo[,1], br.ap_lo[,2], pch = 19, cex = 0.5)
-
-```
-## References
->>>>>>> 6f52747bab1f4707346e46308ab5f26dd1263b24
