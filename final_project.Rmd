@@ -602,6 +602,326 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` *above normal* or *well above normal* seem to be particularly frequent along with the occurrence of heart diseases.
 
+```{r barplots2}
+#Cholesterol
+cholesterol_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, cholesterol = cardio$cholesterol), 
+  FUN = sum
+)
+
+cholesterol_data$total <- ave(cholesterol_data$count, cholesterol_data$cardio, FUN = sum)
+cholesterol_data$percentage <- (cholesterol_data$count / cholesterol_data$total) * 100
+
+pChol <- ggplot(cholesterol_data, aes(x = as.factor(cardio), y = count, fill = cholesterol)) +
+  geom_bar(stat = "identity", position = "stack") + 
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(title = "Population by Cholesterol \nand disease presence", x = expression(paste("\u2003\u2003","Cardio (0 = No Disease, 1 = Disease)")), y = "Count", fill = "Cholesterol") + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
+  theme(plot.margin = margin(1, 1, 1, 2))
+
+#Glucose
+glucose_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, gluc = cardio$gluc), 
+  FUN = sum
+)
+
+glucose_data$total <- ave(glucose_data$count, glucose_data$cardio, FUN = sum)
+glucose_data$percentage <- (glucose_data$count / glucose_data$total) * 100
+
+pGluc <- ggplot(glucose_data, aes(x = as.factor(cardio), y = count, fill = gluc)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Glucose \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Glucose"
+  ) + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
+  theme_minimal()  
+
+# Smoke
+smoke_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, smoke = cardio$smoke), 
+  FUN = sum
+)
+
+smoke_data$total <- ave(smoke_data$count, smoke_data$cardio, FUN = sum)
+smoke_data$percentage <- (smoke_data$count / smoke_data$total) * 100
+
+pSmoke <- ggplot(smoke_data, aes(x = as.factor(cardio), y = count, fill = smoke)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Smoking Status \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Smoking"
+  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+# Active
+active_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, active = cardio$active), 
+  FUN = sum
+)
+
+active_data$total <- ave(active_data$count, active_data$cardio, FUN = sum)
+active_data$percentage <- (active_data$count / active_data$total) * 100
+
+pActive <- ggplot(active_data, aes(x = as.factor(cardio), y = count, fill = active)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Physical Activity \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Active"
+  ) + scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+# Alcohol
+alco_data <- aggregate(
+  x = list(count = rep(1, nrow(cardio))), 
+  by = list(cardio = cardio$cardio, alco = cardio$alco), 
+  FUN = sum
+)
+
+alco_data$total <- ave(alco_data$count, alco_data$cardio, FUN = sum)
+alco_data$percentage <- (alco_data$count / alco_data$total) * 100
+
+pAlco <- ggplot(alco_data, aes(x = as.factor(cardio), y = count, fill = alco)) +
+  geom_bar(stat = "identity", position = "stack") +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5), size = 3) +
+  labs(
+    title = "Population by Alcohol Consumption \nand disease presence",
+    x = "Cardio (0 = No Disease, 1 = Disease)",
+    y = "Count",
+    fill = "Alcohol"
+  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
+  theme_minimal()
+
+grid.arrange(pChol, pGluc,ncol = 2)
+grid.arrange(pSmoke, pActive, ncol = 2)
+grid.arrange(pAlco, ncol = 2)
+
+```
+
+```{r SAVE BARPLOTS}
+chol_gluc_BP = arrangeGrob(pChol, pGluc, ncol=2)
+smoke_active_BP = arrangeGrob(pSmoke, pActive, ncol=2)
+alcol_BP = arrangeGrob(pAlco, ncol=1)
+
+ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
+ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
+ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
+```
+## Cluster analysis
+We proceed by performing cluster analysis. Due to the nature of data, and various experiments with the results, we considered 2 different approaches:
+- considering all the variables, but scaling just the numerical ones.
+- scaling and considering just numerical variables.
+### K-means clustering (scale only numerical)
+```{r}
+# Filter the dataset to exclude these columns and scale the remaining numeric columns
+cardio_scaled_onlynums = cardio_cl
+cardio_scaled_onlynums[, c(continuous_vars)] = scale(cardio_scaled_onlynums[, c(continuous_vars)])
+
+# View the first few rows of the dataset
+head(cardio_scaled_onlynums)
+```
+
+```{r}
+# Compute the distance matrix for the scaled data
+sample_cardio_onlynums = sample(as.matrix(cardio_scaled_onlynums), 10000)
+dist_matrix <- dist(sample_cardio_onlynums)
+```
+
+
+```{r}
+# Perform K-means clustering
+set.seed(123)  
+silhouette_scores_onlynum = c()
+
+# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
+# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
+ for (n_clusters in 2:10) {
+   # Perform k-means clustering
+   kmeans_result <- kmeans(sample_cardio_onlynums, centers = n_clusters)
+
+   # Extract cluster labels from the k-means result
+   cluster_labels <- kmeans_result$cluster
+
+   # Calculate silhouette values
+   sil <- silhouette(cluster_labels, dist_matrix)
+
+   # Store the average silhouette score for the current number of clusters
+   silhouette_scores_onlynum[n_clusters] <- mean(sil[, 3])
+ }
+
+max_silhouette_kmeans_onlynum = which.max(silhouette_scores_onlynum)
+
+best_kmeans_result_onlynum <- kmeans(cardio_cl, centers = max_silhouette_kmeans_onlynum)
+# Add the cluster assignment to the original data
+cardio$Cluster_ON <- as.factor(best_kmeans_result_onlynum$cluster)
+table(cardio$Cluster_ON)
+```
+
+```{r}
+# Visualize the clusters across different dimensions
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster_ON)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster_ON)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+
+grid.arrange(cl_p1, cl_p2)
+```
+
+```{r}
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster_ON)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+grid.arrange(cl_p3, cardio_pl)
+```
+There is a split, but a lot of clusters overlap for central values.
+```{r}
+cluster_summary_ON <- cardio %>%
+  group_by(Cluster_ON) %>%
+  summarize(
+    Count = n(),
+    disease_incidence = sum(cardio == 1)/n(),
+    active_count = sum(active == "Yes")/n(),
+    high_chol = sum(cholesterol %in% c("above normal", "well above normal"))/n(),
+    gluc = sum(gluc %in% c("above normal", "well above normal"))/n(),
+    ap_hi = mean(ap_hi),
+    ap_lo = mean(ap_lo),
+    Female = sum(gender == "F") / n(), 
+    Male = sum(gender == "M") / n() 
+    # Add more summary statistics as needed
+  )
+cluster_summary_ON
+```
+
+### K-means clustering (only numerical)
+```{r}
+cardio_justnum <- scale(cardio_cl[, continuous_vars])
+
+# View the first few rows of the dataset
+head(cardio_justnum)
+```
+
+```{r}
+# Compute the distance matrix for the scaled data
+sample_justnum = sample(cardio_justnum, 10000)
+dist_matrix_justnum <- dist(sample_justnum)
+head(dist_matrix_justnum)
+```
+
+```{r}
+# Perform K-means clustering
+set.seed(123)  
+silhouette_scores_justnum = c()
+
+# Try out different numbers of clustering and see which one has the highest silhouette score (meaning it best divides the data)
+# Due to computational constraints we select just a subset of the original observations, 1/7, to tune this hyperparameter
+ for (n_clusters in 2:10) {
+   # Perform k-means clustering
+   kmeans_result <- kmeans(sample_justnum, centers = n_clusters)
+
+   # Extract cluster labels from the k-means result
+   cluster_labels <- kmeans_result$cluster
+
+   # Calculate silhouette values
+   sil <- silhouette(cluster_labels, dist_matrix)
+
+   # Store the average silhouette score for the current number of clusters
+   silhouette_scores_justnum[n_clusters] <- mean(sil[, 3])
+ }
+
+max_silhouette_kmeans_justnum = which.max(silhouette_scores_justnum)
+
+best_kmeans_result_justnum <- kmeans(cardio_justnum, centers = max_silhouette_kmeans_justnum)
+# Add the cluster assignment to the original data
+cardio$Cluster <- as.factor(best_kmeans_result_justnum$cluster)
+table(cardio$Cluster)
+```
+
+```{r}
+# Visualize the clusters across different dimensions
+cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
+  geom_point() +
+  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+
+grid.arrange(cl_p1, cl_p2)
+```
+
+```{r}
+cl_p3 = ggplot(cardio, aes(ap_hi, ap_lo, color = Cluster)) +
+  geom_point() +
+  scale_color_manual(values = c("1" = "blue", "2" = "red")) + # Invert cluster colors
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)", color = "Cluster")
+cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
+  geom_point() +
+  scale_color_manual(values = c("0" = "red", "1" = "blue")) + # Invert cluster colors
+  labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
+grid.arrange(cl_p3, cardio_pl)
+```
+```{r}
+ggsave("images/2kmodes_justnum_good.png", width=8, height=6)
+```
+
+```{r}
+info_cluster1 = cardio %>% filter(Cluster == 1)
+summary(info_cluster1)
+```
+```{r}
+info_cluster2 = cardio %>% filter(Cluster == 2)
+summary(info_cluster2)
+```
+```{r}
+# Group the data by Cluster and calculate summary statistics
+cluster_summary <- cardio %>%
+  group_by(Cluster) %>%
+  summarize(
+    Count = n(),
+    disease_incidence = sum(cardio == 1)/n(),
+    active_count = sum(active == "Yes")/n(),
+    high_chol = sum(cholesterol %in% c("above normal", "well above normal"))/n(),
+    gluc = sum(gluc %in% c("above normal", "well above normal"))/n(),
+    Female = sum(gender == "F") / n(), 
+    Male = sum(gender == "M") / n(),
+    ap_hi = mean(ap_hi),
+    ap_lo = mean(ap_lo),
+    # Add more summary statistics as needed
+  )
+
+# Print the summary table
+print(cluster_summary)
+```
+
+Now one can clearly see how the clusters different in terms of health: there is a very high incidence of cardiovascular disease in the first cluster, which has also predictably higher levels of cholesterol and glucose present in their blood. Gender percentages are almost equal, with slightly more females being in the "healthier" cluster. Pressures also differ across the two, with $\approx 25$ points difference for systolic and $\approx 14$ for diastolic blood pressure. 
+
+```{r remove cluster labels}
+cardio$Cluster <- NULL
+cardio$Cluster_ON <- NULL
+```
+
+
+>>>>>>> 5a0ff65972e36fbf2e39322d328271f63c1df776
 ## Random Forest
 
 ### Classification trees
@@ -828,14 +1148,14 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(as.numeric(actual_labels), predicted_probs)
+roc_curve_rf <- roc(as.numeric(actual_labels), predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_rf, main = "ROC Curve", col = "blue", lwd = 2)
 
 # Save image
 png("images/rf_roc_curve.png", width = 800, height = 600)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_rf, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
 ```
 
@@ -940,7 +1260,7 @@ print(metrics_df)
 
 ## Logistic Regression
 
-### Complete Model
+### Basic Model
 
 ```{r}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
@@ -1027,14 +1347,14 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_lr <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_lr, main = "ROC Curve", col = "blue", lwd = 2)
 
 # Save image
 png("images/lr_roc_curve.png", width = 800, height = 600)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+plot(roc_curve_lr, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
 ```
 
@@ -1153,8 +1473,8 @@ colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Featur
 feature_importance <- ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
-  labs(title="Feature Importance - Logistic Regression",
-       x="Feature", y="Importance (Coefficient Absolute Value)") +
+  labs(title="Coefficient Value - Logistic Regression",
+       x="Feature", y="Value)") +
   theme_minimal()
 ggsave("images/feature_importance.png", feature_importance, width = 8, height = 8)
 feature_importance
@@ -1377,14 +1697,23 @@ fits1 <- glmnet(X_train, Y_train, family = "binomial", type.measure = "class", a
 predictions <- predict(fits1, newx = X_test, type = "response")
 actual_labels <- Y_test
 
+# Create confusion matrix
+conf_matrix <- confusionMatrix(
+  factor(predictions),
+  factor(actual_labels),
+  positive = "1"
+)
+lasso_sensitivity <- conf_matrix$byClass["Sensitivity"]
+lasso_specificity <- conf_matrix$byClass["Specificity"]
+
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, as.numeric(predictions))
+roc_curve_lasso <- roc(actual_labels, as.numeric(predictions))
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve for LASSO", col = "blue", lwd = 2)
+plot(roc_curve_lasso, main = "ROC Curve for LASSO", col = "blue", lwd = 2)
 ```
 ```{r}
-roc_curve$auc
+roc_curve_lasso$auc
 ```
 
 Lastly, let's fit the polynomial models this way as well
@@ -1410,13 +1739,13 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_poly3 <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve for poly3", col = "blue", lwd = 2)
+plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
 ```
 ```{r}
-roc_curve$auc
+roc_curve_poly3$auc
 ```
 
 ### Polynomial of degree 4
@@ -1441,15 +1770,60 @@ predicted_probs <- predictions[, "Yes"]
 actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve_poly4 <- roc(actual_labels, predicted_probs)
 
 # ROC curve
-plot(roc_curve, main = "ROC Curve for poly4", col = "blue", lwd = 2)
+plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
 ```
 ```{r}
-roc_curve$auc
+roc_curve_poly4$auc
 ```
 
+
+
+## Results
+
+Let's compare the results:
+```{r}
+# Plot the ROC curves
+plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
+plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
+plot(roc_curve_lasso, col = "pink", lwd = 2, add = TRUE)
+plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
+plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
+
+# Add a legend
+legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4"), col = c("red", "blue", "pink", "green", "orange"), lwd = 2)
+
+# Model results
+results <- data.frame(
+  Model = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3", "Polynomial Regression 4"),
+  AUC = c(
+    rf_model$results$ROC,
+    log_model$results$ROC,
+    roc_curve_lasso$auc,
+    poly3$results$ROC,
+    poly4$results$ROC
+  ),
+  Sensitivity = c(
+    rf_model$results$Sens,
+    log_model$results$Sens,
+    lasso_sensitivity,
+    poly3$results$Sens,
+    poly4$results$Sens
+  ),
+  Specificity = c(
+    rf_model$results$Spec,
+    log_model$results$Spec,
+    lasso_specificity,
+    poly3$results$Spec,
+    poly4$results$Spec
+  )
+)
+print(results)
+```
+
+As it is shown above, the four main models get similar results in the task of classifying the data. Despite its slightly better performance, the lack of explainability makes the random forest a less suitable model for this context, leaving the logistic regressions as the best choices. 
 
 
 ## References
