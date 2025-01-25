@@ -602,128 +602,6 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` *above normal* or *well above normal* seem to be particularly frequent along with the occurrence of heart diseases.
 
-```{r barplots2}
-#Cholesterol
-cholesterol_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, cholesterol = cardio$cholesterol), 
-  FUN = sum
-)
-
-cholesterol_data$total <- ave(cholesterol_data$count, cholesterol_data$cardio, FUN = sum)
-cholesterol_data$percentage <- (cholesterol_data$count / cholesterol_data$total) * 100
-
-pChol <- ggplot(cholesterol_data, aes(x = as.factor(cardio), y = count, fill = cholesterol)) +
-  geom_bar(stat = "identity", position = "stack") + 
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(title = "Population by Cholesterol \nand disease presence", x = expression(paste("\u2003\u2003","Cardio (0 = No Disease, 1 = Disease)")), y = "Count", fill = "Cholesterol") + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
-  theme(plot.margin = margin(1, 1, 1, 2))
-
-#Glucose
-glucose_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, gluc = cardio$gluc), 
-  FUN = sum
-)
-
-glucose_data$total <- ave(glucose_data$count, glucose_data$cardio, FUN = sum)
-glucose_data$percentage <- (glucose_data$count / glucose_data$total) * 100
-
-pGluc <- ggplot(glucose_data, aes(x = as.factor(cardio), y = count, fill = gluc)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Glucose \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Glucose"
-  ) + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
-  theme_minimal()  
-
-# Smoke
-smoke_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, smoke = cardio$smoke), 
-  FUN = sum
-)
-
-smoke_data$total <- ave(smoke_data$count, smoke_data$cardio, FUN = sum)
-smoke_data$percentage <- (smoke_data$count / smoke_data$total) * 100
-
-pSmoke <- ggplot(smoke_data, aes(x = as.factor(cardio), y = count, fill = smoke)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Smoking Status \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Smoking"
-  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
-  theme_minimal()
-
-# Active
-active_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, active = cardio$active), 
-  FUN = sum
-)
-
-active_data$total <- ave(active_data$count, active_data$cardio, FUN = sum)
-active_data$percentage <- (active_data$count / active_data$total) * 100
-
-pActive <- ggplot(active_data, aes(x = as.factor(cardio), y = count, fill = active)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Physical Activity \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Active"
-  ) + scale_fill_manual(values = c("royalblue","lightcoral")) +
-  theme_minimal()
-
-# Alcohol
-alco_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, alco = cardio$alco), 
-  FUN = sum
-)
-
-alco_data$total <- ave(alco_data$count, alco_data$cardio, FUN = sum)
-alco_data$percentage <- (alco_data$count / alco_data$total) * 100
-
-pAlco <- ggplot(alco_data, aes(x = as.factor(cardio), y = count, fill = alco)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Alcohol Consumption \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Alcohol"
-  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
-  theme_minimal()
-
-grid.arrange(pChol, pGluc,ncol = 2)
-grid.arrange(pSmoke, pActive, ncol = 2)
-grid.arrange(pAlco, ncol = 2)
-
-```
-
-```{r SAVE BARPLOTS}
-chol_gluc_BP = arrangeGrob(pChol, pGluc, ncol=2)
-smoke_active_BP = arrangeGrob(pSmoke, pActive, ncol=2)
-alcol_BP = arrangeGrob(pAlco, ncol=1)
-
-ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
-ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
-ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
-```
-
 ## Random Forest
 
 ### Classification trees
@@ -916,7 +794,7 @@ if (!is.factor(cardio_cl$cardio)) {
 
 rf_model <- train(
   cardio ~ ., 
-  data = cardio_cl,
+  data = train_data,
   method = "ranger",
   trControl = train_control,
   tuneGrid = tune,
@@ -945,12 +823,12 @@ Regarding the performance of the final model:
 rf_model$results
 
 # Get predicted probabilities
-predictions <- rf_model$finalModel$predictions
-predicted_probs <- predictions[, "Yes"] 
-actual_labels <- cardio_cl$cardio 
+predictions <- predict(rf_model, newdata = test_data, type = "prob")
+predicted_probs <- predictions[, "Yes"]
+actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
-roc_curve <- roc(actual_labels, predicted_probs)
+roc_curve <- roc(as.numeric(actual_labels), predicted_probs)
 
 # ROC curve
 plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
@@ -981,6 +859,8 @@ ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height 
 rf_confusion_matrix
 ```
 
+
+
 ```{r rf_model_other_metrics}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
@@ -1007,7 +887,55 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
-As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
+As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones. \
+
+```{r rf_model_confusion_matrix_OTHER_THRESHOLD}
+## Confusion Matrix for Random Forest
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
+
+# Convert the confusion matrix into a table
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
+
+# Plot the confusion matrix
+rf_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+  geom_tile() +
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Random Forest (threshold = 0.45)", x = "Actual", y = "Predicted")
+ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height = 8)
+rf_confusion_matrix
+```
+
+```{r rf_model_other_metrics_OTHER_THRESHOLD}
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[1,2]
+FN <- cm$table[2,1]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+
+# Print computed metrics
+print(metrics_df)
+```
+
+
 
 
 ## Logistic Regression
@@ -1016,11 +944,15 @@ As we could imagine, this enhanced version of classification trees gets a better
 
 ```{r}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
+levels(cardio$cardio) <- c("Yes", "No")
+levels(train_data$cardio) <- c("Yes", "No")
+levels(test_data$cardio) <- c("Yes", "No")
+
 
 # Cross-validation
 log_model <- train(
   cardio ~ .,                    # Formula
-  data = cardio_cl,             # Dataset
+  data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
@@ -1029,38 +961,42 @@ log_model <- train(
 
 # Print and summarize the model
 print(log_model)
+summary(log_model)
 ```
 
 ```{r lr_decision_boundaries}
-# Generate grid of unique ap_hi and ap_lo values
 grid <- expand.grid(
-  ap_hi = seq(min(cardio_cl$ap_hi), max(cardio_cl$ap_hi), length.out = 200),
-  ap_lo = seq(min(cardio_cl$ap_lo), max(cardio_cl$ap_lo), length.out = 200)
+  ap_hi = seq(min(test_data$ap_hi), max(test_data$ap_hi), length.out = 200),
+  ap_lo = seq(min(test_data$ap_lo), max(test_data$ap_lo), length.out = 200)
 )
 
-other_predictors <- cardio_cl %>%
+# For other predictors, calculate medians for numerical variables and most frequent levels for factors
+other_predictors <- test_data %>%
   select(-c(ap_hi, ap_lo, cardio)) %>%
-  summarise(across(everything(), median))
+  summarise(across(where(is.numeric), median), across(where(is.factor), ~ names(sort(table(.), decreasing = TRUE)[1])))
+
+# Repeat median/frequent level values for all rows of the grid
 grid <- cbind(grid, other_predictors[rep(1, nrow(grid)), ])
 
-# Predict probabilities using the model
+# Convert factor levels in the grid to match the cardio dataset's levels
+grid <- grid %>%
+  mutate(across(where(is.factor), ~ factor(., levels = levels(cardio[[deparse(substitute(.))]]))))
+
+# Predict probabilities for the grid
 probabilities <- predict(log_model, newdata = grid, type = "prob")
+grid$predicted_probs <- probabilities[, 2]  # Extract probabilities for the positive class
 
-# Extract probabilities for the positive class
-grid$predicted_probs <- probabilities[, 2]
-
-
-# Use the grid for contour and tile layers
+# Plot decision boundary
 decision_boundary <- ggplot() +
-  # Decision boundary
+  # Decision boundary contour
   geom_contour(data = grid, aes(x = ap_hi, y = ap_lo, z = predicted_probs), breaks = 0.5, color = "black", linetype = "solid", size = 1) +
   
   # Filled contour plot
   geom_tile(data = grid, aes(x = ap_hi, y = ap_lo, fill = predicted_probs), alpha = 0.8) +
-  scale_fill_gradient(low = "#FFCCCC", high = "#6699FF", name = "P(cardio=1)") +
+  scale_fill_gradient(low = "#FFCCCC", high = "#6699FF", name = "P(cardio=Yes)") +
   
   # Original data points
-  geom_point(data = cardio_cl, aes(x = ap_hi, y = ap_lo, color = as.factor(cardio)), linewidth = 2.5) +
+  geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = as.factor(cardio)), size = 2.5) +
   scale_color_manual(values = c("No" = "#33FF57", "Yes" = "#FF5733"), name = "Cardio") +
   
   # Titles and themes
@@ -1074,7 +1010,10 @@ decision_boundary <- ggplot() +
     legend.position = "right"
   )
 
-ggsave("images/decision_boundary.png", decision_boundary, width = 8, height = 8)
+# Save the plot
+ggsave("images/decision_boundary_cardio.png", decision_boundary, width = 8, height = 8)
+
+# Display the plot
 decision_boundary
 ```
 
@@ -1082,13 +1021,10 @@ decision_boundary
 ### Performance
 
 ```{r log_model_performance}
-# General results
-log_model$results
-
 # Get predicted probabilities
-predictions <- predict(log_model, newdata = log_model$trainingData, type = "prob")
+predictions <- predict(log_model, newdata = test_data, type = "prob")
 predicted_probs <- predictions[, "Yes"] 
-actual_labels <- cardio_cl$cardio 
+actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
 roc_curve <- roc(actual_labels, predicted_probs)
@@ -1115,17 +1051,67 @@ cm_table <- as.data.frame(cm$table)
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
+lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Prediction, y = Reference, fill = Count)) +
+  geom_tile() +
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Logistic Regression", x = "Prediction", y = "Actual")
+ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
+lr_confusion_matrix
+```
+
+
+```{r lg_model_other_metrics}
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[1,2]
+FN <- cm$table[2,1]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+
+# Print computed metrics 
+print(metrics_df)
+ratio <- metrics_df$Value[7]/metrics_df$Value[6]
+```
+
+The False Positive Rate (FPR) is higher than the False Negative Rate (FPR) by a factor of $1.25$. Considering the medical context, we try to lower the threshold to see if we can balance the ratio without losing too much in terms of accuracy. 
+
+```{r log_model_confusion_matrix_OTHER_TRESHOLD}
+## Confusion Matrix for Logistic Regression
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
+
+# Convert the confusion matrix into a table
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
+
+# Plot the confusion matrix
 lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
-  labs(title = "Confusion Matrix: Logistic Regression", x = "Actual", y = "Predicted")
+  labs(title = "Confusion Matrix: Logistic Regression (threshold = 0.45)", x = "Actual", y = "Predicted")
 ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
 lr_confusion_matrix
 ```
 
-```{r lg_model_other_metrics}
+```{r lg_model_other_metrics_OTHER_TRESHOLD}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
 FP <- cm$table[1,2]
@@ -1150,6 +1136,7 @@ metrics_df <- data.frame(
 # Print computed metrics
 print(metrics_df)
 ```
+
 
 ```{r lr-feature-importance}
 # Feature Importance
@@ -1204,10 +1191,11 @@ The weird effect is present just on levels of `gluc` above normal when they inte
 
 ### Pulse Pressure Model
 We create a new variable, named *pulse pressure*, that combines the pressure measurements. $ap\_pu = ap\_hi - ap\_lo$.
+
 ```{r}
-cardio$ap_pu = cardio$ap_hi - cardio$ap_lo
+cardio_cl$ap_pu = cardio$ap_hi - cardio$ap_lo
 log_model_ap_pu <- train(
-  cardio ~ . -ap_hi - ap_lo,                    # Formula
+  cardio ~ . -ap_hi-ap_lo,                    # Formula
   data = cardio_cl,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
@@ -1216,6 +1204,7 @@ log_model_ap_pu <- train(
 )
 
 print(log_model_ap_pu)
+summary(log_model_ap_pu)
 ```
 
 
@@ -1270,6 +1259,7 @@ br <- arm::binned.resids(pred,res)
 It's possible to see that by considering the polynomials of the systolic blood pressure, the residuals follow less of a pattern. Further factors (like higher polynomials and multiple interactions) were also considered but they did not contribute to improving the model. 
 
 We still get strange values for some coefficients (e.g. `gluc`).
+
 We apply LASSO regression to see what coefficients are actually important.
 ```{r}
 set.seed(23)
@@ -1384,7 +1374,7 @@ results
 fits1 <- glmnet(X_train, Y_train, family = "binomial", type.measure = "class", alpha = 1, lambda = lambda_1se)
 
 # Get predicted probabilities
-predictions <- predict(fits1, newx = X_test, type = "class")
+predictions <- predict(fits1, newx = X_test, type = "response")
 actual_labels <- Y_test
 
 # Manually compute the area under ROC curve
@@ -1404,7 +1394,7 @@ Lastly, let's fit the polynomial models this way as well
 # Cross-validation
 poly3 <- train(
   cardio ~ . + poly(ap_hi, 3),                    # Formula
-  data = cardio_cl,             # Dataset
+  data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
@@ -1415,9 +1405,9 @@ poly3 <- train(
 poly3$results
 
 # Get predicted probabilities
-predictions <- predict(poly3, newdata = poly3$trainingData, type = "prob")
+predictions <- predict(poly3, newdata = test_data, type = "prob")
 predicted_probs <- predictions[, "Yes"] 
-actual_labels <- cardio_cl$cardio 
+actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
 roc_curve <- roc(actual_labels, predicted_probs)
@@ -1435,7 +1425,7 @@ roc_curve$auc
 # Cross-validation
 poly4 <- train(
   cardio ~ . + poly(ap_hi, 4),                    # Formula
-  data = cardio_cl,             # Dataset
+  data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
@@ -1446,9 +1436,9 @@ poly4 <- train(
 poly4$results
 
 # Get predicted probabilities
-predictions <- predict(poly4, newdata = poly4$trainingData, type = "prob")
+predictions <- predict(poly4, newdata = test_data, type = "prob")
 predicted_probs <- predictions[, "Yes"] 
-actual_labels <- cardio_cl$cardio 
+actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
 roc_curve <- roc(actual_labels, predicted_probs)
