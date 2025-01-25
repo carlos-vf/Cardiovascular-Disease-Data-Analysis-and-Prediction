@@ -825,7 +825,6 @@ head(cardio_justnum)
 # Compute the distance matrix for the scaled data
 sample_justnum = sample(cardio_justnum, 10000)
 dist_matrix_justnum <- dist(sample_justnum)
-head(dist_matrix_justnum)
 ```
 
 ```{r}
@@ -921,7 +920,7 @@ cardio$Cluster_ON <- NULL
 ```
 
 
->>>>>>> 5a0ff65972e36fbf2e39322d328271f63c1df776
+
 ## Random Forest
 
 ### Classification trees
@@ -1103,14 +1102,7 @@ Finally, let's compute the random forest using our settings.
 
 ```{r random forest (training) 2}
 # Factorize the variable if it is not a factor
-if (!is.factor(cardio_cl$cardio)) {
-  cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
-} else {
-  # Refactor the variable with the correct levels
-  if (!all(levels(cardio_cl$cardio) %in% c("No", "Yes"))) {
-    cardio_cl$cardio <- factor(cardio_cl$cardio, levels = c(0, 1), labels = c("No", "Yes"))
-  }
-}
+train_data$cardio <- factor(train_data$cardio, levels = c(0, 1), labels = c("No", "Yes"))
 
 rf_model <- train(
   cardio ~ ., 
@@ -1162,6 +1154,7 @@ dev.off()
 ```{r rf_model_confusion_matrix}
 ## Confusion Matrix for Random Forest
 predicted_class <- ifelse(predicted_probs >= 0.5, "Yes", "No")
+levels(actual_labels) <- c("No", "Yes")
 cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
 # Convert the confusion matrix into a table
@@ -1516,7 +1509,7 @@ We create a new variable, named *pulse pressure*, that combines the pressure mea
 cardio_cl$ap_pu = cardio$ap_hi - cardio$ap_lo
 log_model_ap_pu <- train(
   cardio ~ . -ap_hi-ap_lo,                    # Formula
-  data = cardio_cl,             # Dataset
+  data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
   trControl = ctrl,              # Cross-validation settings
@@ -1536,6 +1529,8 @@ Let's check the residual plots
 fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
 pred <- predict(fit, type = "response")
 res <- residuals(fit, type = "response")
+
+cardio$cardio <- factor(cardio$cardio, levels = c("No", "Yes"), labels = c(0, 1))
 
 pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit$fitted.values*(1 - fit$fitted.values))
 plot(cardio$ap_hi, pearson_residuals)
@@ -1694,14 +1689,16 @@ results
 fits1 <- glmnet(X_train, Y_train, family = "binomial", type.measure = "class", alpha = 1, lambda = lambda_1se)
 
 # Get predicted probabilities
-predictions <- predict(fits1, newx = X_test, type = "response")
-actual_labels <- Y_test
+predicted_probs <- predict(fits1, newx = X_test, type = "response")
+predicted_class <- ifelse(predicted_probs >= 0.5, "Yes", "No")
+actual_labels <- as.factor(Y_test)
+levels(actual_labels) <- c("No", "Yes")
 
 # Create confusion matrix
 conf_matrix <- confusionMatrix(
-  factor(predictions),
+  factor(predicted_class),
   factor(actual_labels),
-  positive = "1"
+  positive = "Yes"
 )
 lasso_sensitivity <- conf_matrix$byClass["Sensitivity"]
 lasso_specificity <- conf_matrix$byClass["Specificity"]
