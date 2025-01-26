@@ -1832,6 +1832,147 @@ print(results)
 
 As it is shown above, the four main models get similar results in the task of classifying the data. Despite its slightly better performance, the lack of explainability makes the random forest a less suitable model for this context, leaving the logistic regressions as the best choices. 
 
+```{r spline}
+set.seed(23)
+
+library(splines)
+library(MASS)
+library(caret)
+library(pROC)
+
+fit <- glm(cardio ~ ns(age, df = 4) + ns(height, df = 4) + ns(weight, df = 4) + ns(ap_hi, df = 4) +
+              ns(ap_lo, df = 4) + gender + cholesterol + gluc + smoke + alco + active, 
+            data = train_data, family = binomial(link = "logit"))
+
+fit_step <- stepAIC(fit, direction = "both", trace = FALSE)
+
+summary(fit_step)
+
+predicted_probs <- predict(fit_step, newdata = test_data, type = "response")
+
+predicted_class <- ifelse(predicted_probs >= 0.40, "Yes", "No")
+
+actual_labels <- test_data$cardio
+cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
+
+cm_table <- as.data.frame(cm$table)
+colnames(cm_table) <- c("Prediction", "Reference", "Count")
+
+lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+  geom_tile() +
+  geom_text(aes(label = Count), color = "white") +
+  scale_fill_gradient(low = "blue", high = "red") +
+  theme_minimal() +
+  labs(title = "Confusion Matrix: Logistic Regression with Splines (threshold = 0.4)", x = "Actual", y = "Predicted")
+ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
+lr_confusion_matrix
+
+roc_curve <- roc(actual_labels, predicted_probs)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+auc_spline <- auc(roc_curve)
+print(auc_spline)
+png("images/roc_curve.png", width = 800, height = 600)
+plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+dev.off()
+
+TN <- cm$table[1, 1]
+FP <- cm$table[1, 2]
+FN <- cm$table[2, 1]
+TP <- cm$table[2, 2]
+
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+fnr_fpr_ratio <- fnr / fpr
+
+metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR", "FNR/FPR Ratio"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr, fnr_fpr_ratio)
+)
+
+print(metrics_df)
+```
+
+
+```{r spline decision boundary}
+get_mode <- function(x) {
+  uniq_x <- unique(x)
+  uniq_x[which.max(tabulate(match(x, uniq_x)))]  
+}
+ap_hi_range <- seq(min(train_data$ap_hi), max(train_data$ap_hi), length.out = 100)
+ap_lo_range <- seq(min(train_data$ap_lo), max(train_data$ap_lo), length.out = 100)
+grid <- expand.grid(ap_hi = ap_hi_range, ap_lo = ap_lo_range)
+grid$age <- median(train_data$age, na.rm = TRUE)
+grid$height <- median(train_data$height, na.rm = TRUE)
+grid$weight <- median(train_data$weight, na.rm = TRUE)
+grid$cholesterol <- get_mode(train_data$cholesterol)
+grid$gluc <- get_mode(train_data$gluc)
+grid$smoke <- get_mode(train_data$smoke)
+grid$alco <- get_mode(train_data$alco)
+grid$active <- get_mode(train_data$active)
+grid$gender <- get_mode(train_data$gender)
+ap_hi_spline <- ns(grid$ap_hi, df = 4)
+ap_lo_spline <- ns(grid$ap_lo, df = 4)
+grid_splines <- cbind(ap_hi_spline, ap_lo_spline)
+grid_full <- cbind(grid, grid_splines)
+colnames(grid_full) <- c("ap_hi", "ap_lo", "age", "height", "weight", "cholesterol", "gluc", "smoke", "alco", "active", "gender", paste0("ns_ap_hi", 1:4), paste0("ns_ap_lo", 1:4))
+grid_full$gender <- factor(grid_full$gender, levels = levels(train_data$gender))
+grid_full$cholesterol <- factor(grid_full$cholesterol, levels = levels(train_data$cholesterol))
+grid_full$gluc <- factor(grid_full$gluc, levels = levels(train_data$gluc))
+grid_full$smoke <- factor(grid_full$smoke, levels = levels(train_data$smoke))
+grid_full$alco <- factor(grid_full$alco, levels = levels(train_data$alco))
+grid_full$active <- factor(grid_full$active, levels = levels(train_data$active))
+
+grid_full$predicted_probs <- predict(fit_step, newdata = grid_full, type = "response")
+grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.5, "Yes", "No")
+
+# Add new data for "well above normal" cholesterol
+grid_well_above <- grid_full
+grid_well_above$cholesterol <- "well above normal"
+grid_well_above$predicted_probs <- predict(fit_step, newdata = grid_well_above, type = "response")
+grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.5, "Yes", "No")
+
+# Add new data for "above normal" cholesterol
+grid_above_normal <- grid_full
+grid_above_normal$cholesterol <- "above normal"
+grid_above_normal$predicted_probs <- predict(fit_step, newdata = grid_above_normal, type = "response")
+grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.5, "Yes", "No")
+
+# Add new data for "normal" cholesterol (this is the default scenario)
+grid_normal <- grid_full
+grid_normal$cholesterol <- "normal"
+grid_normal$predicted_probs <- predict(fit_step, newdata = grid_normal, type = "response")
+grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.5, "Yes", "No")
+
+ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
+  geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
+  geom_point(data = train_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
+  scale_color_manual(values = c("blue", "red")) +  
+  scale_fill_manual(values = c("blue", "red")) +
+  geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
+               color = "black", size = 1, breaks = 0.5) +
+  geom_contour(data = grid_above_normal, aes(z = predicted_probs, linetype = "Above Normal"), 
+               color = "gray25", size = 1, breaks = 0.5) +
+  geom_contour(data = grid_normal, aes(z = predicted_probs, linetype = "Normal"), 
+               color = "gray95", size = 1, breaks = 0.5) +
+  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels",
+       x = "ap_hi", y = "ap_lo", color = "Cardio Outcome", linetype = "Cholesterol Level") +
+  scale_linetype_manual(values = c("Normal" = "solid", "Above Normal" = "solid", "Well Above Normal" = "solid")) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        legend.box = "horizontal",
+        legend.title = element_text(size = 8),  # Even smaller legend title size
+        legend.text = element_text(size = 6),   # Even smaller legend text size
+        legend.key.size = unit(0.6, "lines"),   # Reduce size of legend keys
+        legend.key.width = unit(0.8, "lines"),  # Reduce the width of the legend keys
+        legend.spacing.x = unit(0.5, "mm"),     # Reduce space between legend items
+        legend.spacing.y = unit(0.5, "mm")) +   # Reduce vertical space between items
+  guides(linetype = guide_legend(ncol = 2))  # Split the legend into two columns
+```
 
 ## References
 
