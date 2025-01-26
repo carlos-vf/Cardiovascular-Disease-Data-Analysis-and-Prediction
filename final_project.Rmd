@@ -1777,60 +1777,7 @@ roc_curve_poly4$auc
 ```
 
 
-
-## Results
-
-Let's compare the results:
-```{r}
-# Plot the ROC curves
-plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
-plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
-plot(roc_curve_lasso, col = "pink", lwd = 2, add = TRUE)
-plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
-plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
-
-# Add a legend
-legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4"), col = c("red", "blue", "pink", "green", "orange"), lwd = 2)
-
-# Save image
-png("images/roc_results.png", width = 800, height = 600)
-plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
-plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
-plot(roc_curve_lasso, col = "pink", lwd = 2, add = TRUE)
-plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
-plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
-legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4"), col = c("red", "blue", "pink", "green", "orange"), lwd = 2)
-dev.off()
-
-# Model results
-results <- data.frame(
-  Model = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3", "Polynomial Regression 4"),
-  AUC = c(
-    rf_model$results$ROC,
-    log_model$results$ROC,
-    roc_curve_lasso$auc,
-    poly3$results$ROC,
-    poly4$results$ROC
-  ),
-  Sensitivity = c(
-    rf_model$results$Sens,
-    log_model$results$Sens,
-    lasso_sensitivity,
-    poly3$results$Sens,
-    poly4$results$Sens
-  ),
-  Specificity = c(
-    rf_model$results$Spec,
-    log_model$results$Spec,
-    lasso_specificity,
-    poly3$results$Spec,
-    poly4$results$Spec
-  )
-)
-print(results)
-```
-
-As it is shown above, the four main models get similar results in the task of classifying the data. Despite its slightly better performance, the lack of explainability makes the random forest a less suitable model for this context, leaving the logistic regressions as the best choices. 
+### Splines
 
 ```{r spline}
 set.seed(23)
@@ -1867,12 +1814,13 @@ lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction
 ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
 lr_confusion_matrix
 
-roc_curve <- roc(actual_labels, predicted_probs)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
-auc_spline <- auc(roc_curve)
+roc_curve_splines <- roc(actual_labels, predicted_probs)
+plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
+auc_spline <- auc(roc_curve_splines)
 print(auc_spline)
-png("images/roc_curve.png", width = 800, height = 600)
-plot(roc_curve, main = "ROC Curve", col = "blue", lwd = 2)
+
+png("images/roc_curve_splines.png", width = 800, height = 600)
+plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
 
 TN <- cm$table[1, 1]
@@ -1889,12 +1837,12 @@ fpr <- FP / (FP + TN)
 fnr <- FN / (FN + TP)
 fnr_fpr_ratio <- fnr / fpr
 
-metrics_df <- data.frame(
+splines_metrics_df <- data.frame(
   Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR", "FNR/FPR Ratio"),
   Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr, fnr_fpr_ratio)
 )
 
-print(metrics_df)
+print(splines_metrics_df)
 ```
 
 
@@ -1950,7 +1898,7 @@ grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.5, "Yes",
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
-  geom_point(data = train_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
+  geom_point(data = train_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), linewidth = 2) + 
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
@@ -1973,6 +1921,68 @@ ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
         legend.spacing.y = unit(0.5, "mm")) +   # Reduce vertical space between items
   guides(linetype = guide_legend(ncol = 2))  # Split the legend into two columns
 ```
+
+
+
+## Results
+
+Let's compare the results:
+```{r}
+# Plot the ROC curves
+plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
+plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
+plot(roc_curve_lasso, col = "pink", lwd = 2, add = TRUE)
+plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
+plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
+plot(roc_curve_splines, col = "purple", lwd = 2, add = TRUE)
+
+# Add a legend
+legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4", "Splines"), col = c("red", "blue", "pink", "green", "orange", "purple"), lwd = 2)
+
+# Save image
+png("images/roc_results.png", width = 800, height = 600)
+plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
+plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
+plot(roc_curve_lasso, col = "pink", lwd = 2, add = TRUE)
+plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
+plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
+plot(roc_curve_splines, col = "purple", lwd = 2, add = TRUE)
+legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4", "Splines"), col = c("red", "blue", "pink", "green", "orange", "purple"), lwd = 2)
+dev.off()
+
+# Model results
+results <- data.frame(
+  Model = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3", "Polynomial Regression 4", "Splines"),
+  AUC = c(
+    rf_model$results$ROC,
+    log_model$results$ROC,
+    roc_curve_lasso$auc,
+    poly3$results$ROC,
+    poly4$results$ROC,
+    auc_spline
+  ),
+  Sensitivity = c(
+    rf_model$results$Sens,
+    log_model$results$Sens,
+    lasso_sensitivity,
+    poly3$results$Sens,
+    poly4$results$Sens,
+    splines_metrics_df$Value[splines_metrics_df$Metric == "Recall (Sensitivity)"]
+  ),
+  Specificity = c(
+    rf_model$results$Spec,
+    log_model$results$Spec,
+    lasso_specificity,
+    poly3$results$Spec,
+    poly4$results$Spec,
+    splines_metrics_df$Value[splines_metrics_df$Metric == "Specificity"]
+  )
+)
+print(results)
+```
+
+As it is shown above, the four main models get similar results in the task of classifying the data. Despite its slightly better performance, the lack of explainability makes the random forest a less suitable model for this context, leaving the logistic regressions as the best choices. 
+
 
 ## References
 
