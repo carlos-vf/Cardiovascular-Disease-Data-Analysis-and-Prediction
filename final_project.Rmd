@@ -1257,9 +1257,9 @@ print(metrics_df)
 
 ```{r}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
-levels(cardio$cardio) <- c("Yes", "No")
-levels(train_data$cardio) <- c("Yes", "No")
-levels(test_data$cardio) <- c("Yes", "No")
+levels(cardio$cardio) <- c("No", "Yes")
+levels(train_data$cardio) <- c("No", "Yes")
+levels(test_data$cardio) <- c("No", "Yes")
 
 
 # Cross-validation
