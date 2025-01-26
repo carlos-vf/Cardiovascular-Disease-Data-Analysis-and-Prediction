@@ -5,11 +5,11 @@ date: "2025-01-07"
 output: 
   html_document:
     toc: true
-    toc_depth: '3'
+    toc_depth: '4'
     df_print: paged
   pdf_document:
     toc: true
-    toc_depth: 3
+    toc_depth: 4
 editor_options: 
   markdown: 
     wrap: 72
@@ -126,11 +126,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Introduction
 
-The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset]. [TABLE OF CONTENTS, SUMMARY OF WHAT HAS BEEN DONE]## Install packages
-```{r, eval=FALSE}
-packages <- c("caret", "cluster", "corrplot", "dendextend", "doParallel", "dplyr", 
-              "factoextra", "ggplot2", "gridExtra", "patchwork", "parallel", 
-              "pROC", "ranger", "reshape2", "rpart", "rpart.plot", "GGally")
+The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset].
+
+
+## Importing libraries
+
+```{r package_installation}
+packages <- c("arm", "caret", "cluster", "corrplot", "dendextend", "doParallel", "dplyr", 
+              "GGally", "ggplot2", "glmnet", "gridExtra", "patchwork", "parallel", 
+              "pROC", "ranger", "reshape2", "rpart", "rpart.plot")
 
 install_if_missing <- function(pkg) {
   if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
@@ -138,10 +142,9 @@ install_if_missing <- function(pkg) {
   }
 }
 
-invisible(lapply(packages, install_if_missing))
+suppressMessages(invisible(lapply(packages, install_if_missing)))
 ```
 
-## Importing libraries
 ```{r libraries}
 suppressMessages(library(arm))
 suppressMessages(library(caret))
@@ -167,15 +170,6 @@ suppressMessages(library(rpart.plot))
 
 Firstly, an exploratory analysis has been conducted, with the purpose of identifying problems and have at a glance an idea of meaning and distribution of the variables.
 
-```{r 'Explorative analysis and data cleaning'}
-cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
-cardio <- cardio_with_id[,-1]
-sum(as.numeric(is.na(cardio)))
-str(cardio)
-summary(cardio)
-par(mfrow = c(2,2))
-```
-
 The dataset contains 70000 observations of 12 variables. The source doesn't specify how the data was recovered or generated, and it has not been possible to find it elsewhere than Kaggle. The variables are the following:\
 
 - **cardio** : objective variable of our analysis. It is a binary variable representing whether cardiovascular disease is present in the patient. \
@@ -191,9 +185,27 @@ The dataset contains 70000 observations of 12 variables. The source doesn't spec
 - **alco** : binary variable, representing alcohol intake.\
 - **active** : binary variable, representing physical activity.
 
-The last three variables are marked as "subjective", meaning that this piece of information is likely supplied by patients themselves, possibly using different metrics.\
-\
-There are no NA values. However, from the summary we can see that there are variables with impossible values: specifically, *ap_hi* and *ap_lo* have in some cases negative values, which doesn't make sense even for a dead person, and in other cases extremely high values. 
+The last three variables are marked as "subjective", meaning that this piece of information is likely supplied by patients themselves, possibly using different metrics.
+
+
+### Preprocessing
+
+First of all, we need to check if there are NA values in the data:
+```{r 'Explorative analysis and data cleaning 1'}
+cardio_with_id <- read.csv("data/cardio_train.csv", sep= ";", header=TRUE)
+cardio <- cardio_with_id[,-1]
+str(cardio)
+sum(as.numeric(is.na(cardio)))
+```
+
+It seems like there are no NA values. Let's check some other general metrics:
+
+```{r 'Explorative analysis and data cleaning 2'}
+summary(cardio)
+```
+
+From the summary we can see that there are variables with impossible values: specifically, `ap_hi` and `ap_lo` have in some cases negative values, which doesn't make sense (even for a dead person), and in other cases extremely high values. 
+
 A cut-off value value for the blood pressure is selected (generously) by basing on a study that measured blood pressure during intense exercise, and found a maximum pressure of 370/360 while using the Valsalva and a maximum of 250/230 without it 
 [@narloch1995influence]. 
 
@@ -202,9 +214,9 @@ summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|
 cardio <- cardio[!(cardio$ap_hi < 25 | cardio$ap_hi > 400 | cardio$ap_lo <  10| cardio$ap_lo > 400 | cardio$ap_hi < (cardio$ap_lo + 1) | cardio$ap_hi-cardio$ap_lo > 160),]
 ```
 
-1274 observations have completely unrealistic values for either systolic or diastolic pressure (or both). In 274 of them, the systolic pressure is less than the diastolic, which is also not possible. These wrong metrics are less than 2% of the dataset, so the most straightforward approach is just to eliminate the problematic rows. \
+1274 observations have completely unrealistic values for either systolic or diastolic pressure (or both). In 274 of them, the systolic pressure is less than the diastolic, which is also not possible. These wrong metrics are less than 2% of the dataset, so the most straightforward approach is just to eliminate the problematic rows.
 
-Dividing age by 365 to obtain it in years:
+In order to make data more understandable, we will transform the age (currently in days) to years.
 
 ```{r}
 cardio$age = floor(cardio$age/365)
@@ -213,104 +225,64 @@ ggplot(cardio, aes(y = age)) +
   geom_boxplot(fill = "skyblue", color = "black") + labs(
     y = "Age"                                       
   ) +
-  theme_minimal()   
-nrow(cardio[cardio$age<40,])
-# saving a copy of cardio with filtered values but without factor columns for clustering later on
-cardio_cl <- cardio
+  theme_minimal() 
 ```
-
-There are only 4 observations concerning people < 40 years old, and the youngest one in the sample is 30: for this reason, we split between under (or equal to) and over 55.
-
-### Correlation analysis
-
-
-The heatmap confirms some (perhaps rather intuitive) relationships:
-
-- Diastolic and systolic blood pressure are heavily correlated
-- Both weight and age are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.\
-
-```{r}
-library(reshape2)
-library(ggplot2)
-cor_cardio <- round(cor(as.data.frame(cardio)), 2)
-
-melt_cardio <- melt(cor_cardio, na.rm = TRUE)  
-labels <- c(
-  "age","gender*", "height", "weight", "ap_hi", "ap_lo", "cholesterol*", "gluc*", "smoke*", "alco*", "active*", "cardio*")  
-corr_heatmap<- ggplot(data = melt_cardio, aes(x = Var1, y = Var2, fill = value)) + 
-  geom_tile() +
-  geom_text(aes(label = value), size = 4) + 
-  scale_fill_gradient2(low = "blue", high = "red", limit = c(-1, 1), name = "Correlation") +
-  scale_x_discrete(labels = labels) +  
-  scale_y_discrete(labels = labels) + 
-  theme_minimal() +  labs(caption = "Variables marked with * are categorical.") +
-  theme(
-    axis.title.x = element_blank(),
-    axis.title.y = element_blank(),
-    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
-    axis.text.y = element_text(size = 10)  
-  )
-
-corr_heatmap
-ggsave("images/corrheatmap.png", corr_heatmap, width = 8, height = 8)
-
+```{r age_categorizing 1}
+nrow(cardio[cardio$age<39,])
 ```
+Given that there are only 4 observations concerning people < 39 years old, and the youngest one in the sample is 29, we will split data between under (or equal to) and over 55.
 
-```{r age_categorizing}
+```{r age_categorizing 2}
 cardio$age_cat <- ifelse(cardio$age <= 55, '30-55', '55-65')
 table(cardio$age_cat)
-cardio$age_cat <- factor(cardio$age_cat)
-#levels(cardio$age_cat) = c("Senior", "Elderly")
-levels(cardio$age_cat) = c("Under 55", "Over 55")
 ```
 
-```{r}
+Factorization must also be applied to some variables:
+```{r factor_transformation}
+# saving a copy of cardio without factor columns later on
+cardio_cl <- subset(cardio, select = -age_cat)
+
 cardio$gender <- factor(cardio$gender)
 levels(cardio$gender) = c("F", "M")
-#head(cardio$gender)
 
 cardio$cardio <- as.factor(cardio$cardio)
-#head(cardio$cardio)
 
 cardio$cholesterol <- factor(cardio$cholesterol)
 levels(cardio$cholesterol) = c("normal", "above normal", "well above normal")
-#head(cardio$cholesterol)
 
 cardio$gluc <- factor(cardio$gluc)
 levels(cardio$gluc) = c("normal", "above normal", "well above normal")
-#head(cardio$gluc)
 
 cardio$smoke <- factor(cardio$smoke)
 levels(cardio$smoke) = c("No", "Yes")
-#head(cardio$smoke)
 
 cardio$alco <- factor(cardio$alco)
 levels(cardio$alco) = c("No", "Yes")
-#head(cardio$alco)
 
 cardio$active <- factor(cardio$active)
 levels(cardio$active) = c("No", "Yes")
-#head(cardio$active)
+
+cardio$age_cat <- factor(cardio$age_cat)
+levels(cardio$age_cat) = c("Under 55", "Over 55")
 ```
 
+
+### Distribution
+
+It is important to know the proportion of classes in the target variable.
 ```{r}
 table(cardio$cardio)
 ```
 
-The dataset is balanced with respect to the target variable.\
+It looks like the dataset is balanced with respect to `cardio`.
 
+For convenience, numerical and categorical variables will be specified:
 ```{r}
-cardio$age_cat <- factor(cardio$age_cat)
-levels(cardio$age_cat) = c("Under 55", "Over 55")
-
-```
-Numerical and categorical variables are specified for convenience:
-
-```{r eval=TRUE, include=TRUE}
 numerical <- cardio[, c("age", "height", "weight", "ap_hi", "ap_lo")]
 categorical <- cardio[!(names(cardio) %in% c("age", "height", "weight", "ap_hi", "ap_lo"))]
 ```
 
+Let's explore first the frequency of the **numerical** variables in a more visual way:
 ```{r eval=TRUE}
 num_vars <- ncol(numerical)
 par(mfrow = c(ceiling(sqrt(num_vars)), floor(sqrt(num_vars)))) 
@@ -411,7 +383,6 @@ save_plots <- function(plot_list){
     
     # Close the device
     dev.off()
-    cat("Plots saved successfully in the 'images' directory.\n")
   }
 }
 plots_density <- list(
@@ -426,7 +397,7 @@ save_plots(plots_density)
 ```
 
 
-Let's now explore the possible relationships of the categorical variables with cardio.
+Now let's explore the possible relationships of the **categorical** variables with respect to `cardio`.
 
 ```{r barplots}
 
@@ -490,7 +461,42 @@ ggsave("images/agecat.png", acat, width = 8, height = 8)
 
 Within people having heart a disease, high cholesterol, glucose and older age people are significantly overrepresented, and to a smaller extent are also inactive people. Surprisingly, the percentage of smokers and alcohol consumers is slightly higher for the healthy group, whereas gender doesn't seem to have significant differences.
 
-We use the Chi-squared test to see to which degree the variables are correlated with cardio:
+
+
+### Correlation analysis
+
+The following heatmap confirms some (perhaps rather intuitive) relationships:
+
+- Diastolic (`ap_lo`) and systolic (`ap_hi`) blood pressure are heavily correlated
+- Both `weight` and `age` are positively correlated with higher diastolic and systolic blood pressure, the former slightly more than the latter.\
+
+```{r}
+cor_cardio <- round(cor(as.data.frame(cardio_cl)), 2)
+
+melt_cardio <- melt(cor_cardio, na.rm = TRUE)  
+labels <- c(
+  "age","gender*", "height", "weight", "ap_hi", "ap_lo", "cholesterol*", "gluc*", "smoke*", "alco*", "active*", "cardio*")  
+corr_heatmap<- ggplot(data = melt_cardio, aes(x = Var1, y = Var2, fill = value)) + 
+  geom_tile() +
+  geom_text(aes(label = value), size = 4) + 
+  scale_fill_gradient2(low = "blue", high = "red", limit = c(-1, 1), name = "Correlation") +
+  scale_x_discrete(labels = labels) +  
+  scale_y_discrete(labels = labels) + 
+  theme_minimal() +  labs(caption = "Variables marked with * are categorical.") +
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_blank(),
+    axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1),
+    axis.text.y = element_text(size = 10)  
+  )
+
+corr_heatmap
+ggsave("images/corrheatmap.png", corr_heatmap, width = 8, height = 8)
+
+```
+
+
+We use the Chi-squared test to see to which degree the variables are correlated with `cardio`:
 
 ```{r}
 categorical_vars <- names(categorical)[names(categorical) != "cardio"]
@@ -512,10 +518,9 @@ cat("Variables with significant association (p < 0.05):\n")
 print(significant_vars)
 ```
 
-We see that all of the available categorical variables, besides gender, seem to be very relevant in determining the insurgence of heart diseases.
+We see that all of the available categorical variables, besides `gender`, seem to be very relevant in determining the insurgence of heart diseases.
 
-Let's now test the mean differences between groups for dystolic and systolic blood pressure.
-We perform t-tests for binary variables, and ANOVA tests for groups of more than 2. -> why? justify
+Let's now test the mean differences between groups for diastolic and systolic blood pressure. We perform t-tests for binary variables, and ANOVA tests for groups of more than two.
 
 ```{r}
 continuous_vars = c("ap_hi", "ap_lo", "weight", "height", "age")
@@ -564,7 +569,6 @@ print(result)
 Once again, there definitely are some significant differences between the groups considered.
 
 ```{r}
-
 custom_colors <- c("darkviolet","orange", "#228b22")
 
 # Function to create plots
@@ -602,132 +606,16 @@ ggsave("images/APHIalco_gluc.png", second2cat, width = 8, height = 8)
 
 While no group shows a clean division with respect to `cardio`, values of both `gluc` and `cholesterol` *above normal* or *well above normal* seem to be particularly frequent along with the occurrence of heart diseases.
 
-```{r barplots2}
-#Cholesterol
-cholesterol_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, cholesterol = cardio$cholesterol), 
-  FUN = sum
-)
 
-cholesterol_data$total <- ave(cholesterol_data$count, cholesterol_data$cardio, FUN = sum)
-cholesterol_data$percentage <- (cholesterol_data$count / cholesterol_data$total) * 100
-
-pChol <- ggplot(cholesterol_data, aes(x = as.factor(cardio), y = count, fill = cholesterol)) +
-  geom_bar(stat = "identity", position = "stack") + 
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(title = "Population by Cholesterol \nand disease presence", x = expression(paste("\u2003\u2003","Cardio (0 = No Disease, 1 = Disease)")), y = "Count", fill = "Cholesterol") + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
-  theme(plot.margin = margin(1, 1, 1, 2))
-
-#Glucose
-glucose_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, gluc = cardio$gluc), 
-  FUN = sum
-)
-
-glucose_data$total <- ave(glucose_data$count, glucose_data$cardio, FUN = sum)
-glucose_data$percentage <- (glucose_data$count / glucose_data$total) * 100
-
-pGluc <- ggplot(glucose_data, aes(x = as.factor(cardio), y = count, fill = gluc)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Glucose \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Glucose"
-  ) + scale_fill_manual(values = c("royalblue", "gold", "lightcoral")) +
-  theme_minimal()  
-
-# Smoke
-smoke_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, smoke = cardio$smoke), 
-  FUN = sum
-)
-
-smoke_data$total <- ave(smoke_data$count, smoke_data$cardio, FUN = sum)
-smoke_data$percentage <- (smoke_data$count / smoke_data$total) * 100
-
-pSmoke <- ggplot(smoke_data, aes(x = as.factor(cardio), y = count, fill = smoke)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Smoking Status \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Smoking"
-  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
-  theme_minimal()
-
-# Active
-active_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, active = cardio$active), 
-  FUN = sum
-)
-
-active_data$total <- ave(active_data$count, active_data$cardio, FUN = sum)
-active_data$percentage <- (active_data$count / active_data$total) * 100
-
-pActive <- ggplot(active_data, aes(x = as.factor(cardio), y = count, fill = active)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Physical Activity \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Active"
-  ) + scale_fill_manual(values = c("royalblue","lightcoral")) +
-  theme_minimal()
-
-# Alcohol
-alco_data <- aggregate(
-  x = list(count = rep(1, nrow(cardio))), 
-  by = list(cardio = cardio$cardio, alco = cardio$alco), 
-  FUN = sum
-)
-
-alco_data$total <- ave(alco_data$count, alco_data$cardio, FUN = sum)
-alco_data$percentage <- (alco_data$count / alco_data$total) * 100
-
-pAlco <- ggplot(alco_data, aes(x = as.factor(cardio), y = count, fill = alco)) +
-  geom_bar(stat = "identity", position = "stack") +
-  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
-            position = position_stack(vjust = 0.5), size = 3) +
-  labs(
-    title = "Population by Alcohol Consumption \nand disease presence",
-    x = "Cardio (0 = No Disease, 1 = Disease)",
-    y = "Count",
-    fill = "Alcohol"
-  ) +  scale_fill_manual(values = c("royalblue","lightcoral")) +
-  theme_minimal()
-
-grid.arrange(pChol, pGluc,ncol = 2)
-grid.arrange(pSmoke, pActive, ncol = 2)
-grid.arrange(pAlco, ncol = 2)
-
-```
-
-```{r SAVE BARPLOTS}
-chol_gluc_BP = arrangeGrob(pChol, pGluc, ncol=2)
-smoke_active_BP = arrangeGrob(pSmoke, pActive, ncol=2)
-alcol_BP = arrangeGrob(pAlco, ncol=1)
-
-ggsave("images/Barplot_chol_gluc.png", chol_gluc_BP, width = 8, height = 8)
-ggsave("images/Barplot_smoke_active.png", smoke_active_BP, width = 8, height = 8)
-ggsave("images/Barplot_alcol.png", alcol_BP, width = 8, height = 8)
-```
 ## Cluster analysis
+
 We proceed by performing cluster analysis. Due to the nature of data, and various experiments with the results, we considered 2 different approaches:
-- considering all the variables, but scaling just the numerical ones.
-- scaling and considering just numerical variables.
-### K-means clustering (scale only numerical)
+
+- Considering all the variables, but scaling just the numerical ones.
+- Scaling and considering just numerical variables.
+
+### K-means clustering (all variables)
+
 ```{r}
 # Filter the dataset to exclude these columns and scale the remaining numeric columns
 cardio_scaled_onlynums = cardio_cl
@@ -813,7 +701,7 @@ cluster_summary_ON <- cardio %>%
 cluster_summary_ON
 ```
 
-### K-means clustering (only numerical)
+### K-means clustering (numerical variables)
 ```{r}
 cardio_justnum <- scale(cardio_cl[, continuous_vars])
 
@@ -1306,7 +1194,7 @@ decision_boundary <- ggplot() +
   
   # Filled contour plot
   geom_tile(data = grid, aes(x = ap_hi, y = ap_lo, fill = predicted_probs), alpha = 0.8) +
-  scale_fill_gradient(low = "#FFCCCC", high = "#6699FF", name = "P(cardio=Yes)") +
+  scale_fill_gradient(low = "#6699FF", high = "#FFCCCC", name = "P(cardio=Yes)") +
   
   # Original data points
   geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = as.factor(cardio)), size = 2.5) +
@@ -1481,7 +1369,9 @@ We hypothesize that this could be due to some sort of "correspondence" or "multi
 Let's now further investigate the relationship between some of the variables and heart disease
 
 
-### Smoke & Alcohol Model
+### Interaction between Variables
+
+#### Smoke & Alcohol Model
 ```{r}
 smoke_check = glm(cardio ~ smoke + alco, data = train_data, family = binomial(link = "logit") )
 summary(smoke_check)
@@ -1490,7 +1380,7 @@ Even if taken as the single predictor, it still counterintuitively contributes n
 In the data exploration part, we saw that there were, numerically, minimal differences between groups with regard do this variable. 
 Furthermore both of these variables are *subjective*, meaning that the answer was at the respondent's discretion. This means one could straight up lie, or even, having quit recently, answer *no* even though the effects of alcohol consumption or smoking were already present. 
 
-### Glucose & Cholesterol Model
+#### Glucose & Cholesterol Model
 ```{r}
 gluc_check = glm(cardio ~ gluc + cholesterol, data = train_data, family = binomial(link = "logit"))
 summary(gluc_check)
@@ -1502,7 +1392,7 @@ summary(interaction_gluc_cardio)
 ```
 The weird effect is present just on levels of `gluc` above normal when they interact with high cholesterol. Taken individually, when they are significant, they contribute positively to the insurgence of heart diseases, as expected.  
 
-### Pulse Pressure Model
+#### Pulse Pressure Model
 We create a new variable, named *pulse pressure*, that combines the pressure measurements. $ap\_pu = ap\_hi - ap\_lo$.
 
 ```{r}
@@ -1522,7 +1412,9 @@ summary(log_model_ap_pu)
 
 
 
-### Model diagnostics
+### Polynomial Regressions
+
+#### Residuals
 
 Let's check the residual plots
 ```{r original_residuals 1}
@@ -1544,7 +1436,7 @@ We can see that they are larger at the extremes. They correspond to the points w
 binnedplot(pred,res, nclass = 1000)
 ```
 
-Let's see if a polynomial regression can improve the model's fit:
+Let's see if a polynomial regression can improve the model's fit.
 
 ```{r}
 fit_poly3 <- glm(cardio ~ .+poly(ap_hi, 3), data = cardio, family = binomial(link = "logit"))
@@ -1570,6 +1462,9 @@ plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
 binnedplot(pred,res, nclass = 1000)
 br <- arm::binned.resids(pred,res)
 ```
+
+
+#### LASSO
 
 It's possible to see that by considering the polynomials of the systolic blood pressure, the residuals follow less of a pattern. Further factors (like higher polynomials and multiple interactions) were also considered but they did not contribute to improving the model. 
 
@@ -1715,7 +1610,7 @@ roc_curve_lasso$auc
 
 Lastly, let's fit the polynomial models this way as well
 
-### Polynomial of degree 3
+#### Polynomial of degree 3
 ```{r}
 # Cross-validation
 poly3 <- train(
@@ -1745,7 +1640,7 @@ plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
 roc_curve_poly3$auc
 ```
 
-### Polynomial of degree 4
+#### Polynomial of degree 4
 ```{r}
 
 # Cross-validation
@@ -1898,15 +1793,15 @@ grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.5, "Yes",
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
-  geom_point(data = train_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), linewidth = 2) + 
+  geom_point(data = train_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
-               color = "black", size = 1, breaks = 0.5) +
+               color = "black", linewidth = 1, breaks = 0.5) +
   geom_contour(data = grid_above_normal, aes(z = predicted_probs, linetype = "Above Normal"), 
-               color = "gray25", size = 1, breaks = 0.5) +
+               color = "gray25", linewidth = 1, breaks = 0.5) +
   geom_contour(data = grid_normal, aes(z = predicted_probs, linetype = "Normal"), 
-               color = "gray95", size = 1, breaks = 0.5) +
+               color = "gray95", linewidth = 1, breaks = 0.5) +
   labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels",
        x = "ap_hi", y = "ap_lo", color = "Cardio Outcome", linetype = "Cholesterol Level") +
   scale_linetype_manual(values = c("Normal" = "solid", "Above Normal" = "solid", "Well Above Normal" = "solid")) +
