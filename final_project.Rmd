@@ -1302,7 +1302,7 @@ grid$predicted_probs <- probabilities[, 2]  # Extract probabilities for the posi
 # Plot decision boundary
 decision_boundary <- ggplot() +
   # Decision boundary contour
-  geom_contour(data = grid, aes(x = ap_hi, y = ap_lo, z = predicted_probs), breaks = 0.5, color = "black", linetype = "solid", size = 1) +
+  geom_contour(data = grid, aes(x = ap_hi, y = ap_lo, z = predicted_probs), breaks = 0.5, color = "black", linetype = "solid", linewidth = 1) +
   
   # Filled contour plot
   geom_tile(data = grid, aes(x = ap_hi, y = ap_lo, fill = predicted_probs), alpha = 0.8) +
@@ -1719,7 +1719,7 @@ Lastly, let's fit the polynomial models this way as well
 ```{r}
 # Cross-validation
 poly3 <- train(
-  cardio ~ . + poly(ap_hi, 3),                    # Formula
+  cardio ~ . + poly(ap_hi, 3),   # Formula
   data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
@@ -1750,7 +1750,7 @@ roc_curve_poly3$auc
 
 # Cross-validation
 poly4 <- train(
-  cardio ~ . + poly(ap_hi, 4),                    # Formula
+  cardio ~ . + poly(ap_hi, 4),   # Formula
   data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
@@ -1791,6 +1791,16 @@ plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
 
 # Add a legend
 legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4"), col = c("red", "blue", "pink", "green", "orange"), lwd = 2)
+
+# Save image
+png("images/roc_results.png", width = 800, height = 600)
+plot(roc_curve_rf, col = "red", lwd = 2, main = "ROC Curves for the main models")
+plot(roc_curve_lr, col = "blue", lwd = 2, add = TRUE)
+plot(roc_curve_lasso, col = "pink", lwd = 2, add = TRUE)
+plot(roc_curve_poly3, col = "green", lwd = 2, add = TRUE)
+plot(roc_curve_poly4, col = "orange", lwd = 2, add = TRUE)
+legend("bottomright", legend = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3",  "Polynomial Regression 4"), col = c("red", "blue", "pink", "green", "orange"), lwd = 2)
+dev.off()
 
 # Model results
 results <- data.frame(
