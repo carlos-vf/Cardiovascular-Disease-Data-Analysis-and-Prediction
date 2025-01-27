@@ -87,10 +87,21 @@ references:
     publisher: "EGEA"
     issued:
       year: 2014
+      
+  - id: Guyton2006medico
+    title: "Fisiologia Medica"
+    author:
+      - family: "Guyton"
+        given: "Arthur C."
+      - family: "Pauli"
+        given: "Hall"
+    publisher: "John E."
+    issued:
+      year: 2006
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
 ```
 
 
@@ -182,7 +193,7 @@ summary(cardio)
 From the summary we can see that there are variables with impossible values: specifically, `ap_hi` and `ap_lo` have in some cases negative values, which doesn't make sense (even for a dead person), and in other cases extremely high values. 
 
 A cut-off value value for the blood pressure is selected (generously) by basing on a study that measured blood pressure during intense exercise, and found a maximum pressure of 370/360 while using the Valsalva and a maximum of 250/230 without it 
-[@narloch1995influence]. 
+[@narloch1995influence] [@Guyton2006medico]. 
 
 ```{r}
 summary(cardio[(cardio$ap_hi<0|cardio$ap_hi>400|cardio$ap_lo<0|cardio$ap_lo>400|cardio$ap_hi<cardio$ap_lo),])
@@ -723,10 +734,11 @@ table(cardio$Cluster)
 ```{r}
 # Visualize the clusters across different dimensions
 cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster)) +
-  geom_point() +
+  geom_point(size = 0.8, alpha = 0.8) + 
+  geom_jitter(width = 0.25, size = 0.8, alpha = 0.8) + 
   labs(title = "K-Means Clustering (cardio vs ap_hi)")
 cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster)) +
-  geom_point() +
+  geom_point(size = 0.8, alpha = 0.8) +  geom_jitter(width = 0.25, size = 0.8, alpha = 0.8) +
   labs(title = "K-Means Clustering (cardio vs ap_lo)")
 
 grid.arrange(cl_p1, cl_p2)
@@ -1956,4 +1968,3 @@ Regarding the interpretation of the models, and based on the vanilla logistic re
 
 
 ## References
-
