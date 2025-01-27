@@ -1656,7 +1656,6 @@ roc_curve_poly3$auc
 
 #### Polynomial of degree 4
 ```{r}
-
 # Cross-validation
 poly4 <- train(
   cardio ~ . + poly(ap_hi, 4),   # Formula
@@ -1681,7 +1680,7 @@ roc_curve_poly4 <- roc(actual_labels, predicted_probs)
 auc_poly4 <- auc(roc_curve_poly4)
 
 # Create confusion matrix
-cf <- confusionMatrix(
+cm <- confusionMatrix(
   factor(predicted_class),
   factor(actual_labels),
   positive = "Yes"
