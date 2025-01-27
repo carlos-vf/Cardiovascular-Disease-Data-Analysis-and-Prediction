@@ -1,5 +1,5 @@
 ---
-title: "Cardiovascular Disease Data Analysis"
+title: "Cardiovascular Disease Data Analysis and Prediction"
 author: Giovanni Billo, Muhammad Mubashar Shahzad, Carlos Velázquez Fernández, Fabio Vicig
 date: "2025-01-07"
 output: 
@@ -57,34 +57,36 @@ references:
     issued:
       year: 2010
     DOI: "10.3747/pdi.2010.00002"
+    
   - id: tibshirani2009elements
-  title: "The Elements of Statistical Learning: Data Mining, Inference, and Prediction"
-  author:
-    - family: "Hastie"
-      given: "Trevor"
-    - family: "Tibshirani"
-      given: "Robert"
-    - family: "Friedman"
-      given: "Jerome"
-  container-title: "Springer Series in Statistics"
-  edition: 2
-  publisher: "Springer"
-  issued:
-    year: 2009
-  DOI: "10.1007/978-0-387-84858-7"
-- id: grigoletto2014modello
-  title: "Modello Lineare: Teoria e Applicazioni con R"
-  author:
-    - family: "Grigoletto"
-      given: "Matteo"
-    - family: "Pauli"
-      given: "Francesco"
-    - family: "Ventura"
-      given: "Laura"
-  container-title: "Statistica e Probabilità"
-  publisher: "EGEA"
-  issued:
-    year: 2014
+    title: "The Elements of Statistical Learning: Data Mining, Inference, and Prediction"
+    author:
+      - family: "Hastie"
+        given: "Trevor"
+      - family: "Tibshirani"
+        given: "Robert"
+      - family: "Friedman"
+        given: "Jerome"
+    container-title: "Springer Series in Statistics"
+    edition: 2
+    publisher: "Springer"
+    issued:
+      year: 2009
+    DOI: "10.1007/978-0-387-84858-7"
+  
+  - id: grigoletto2014modello
+    title: "Modello Lineare: Teoria e Applicazioni con R"
+    author:
+      - family: "Grigoletto"
+        given: "Matteo"
+      - family: "Pauli"
+        given: "Francesco"
+      - family: "Ventura"
+        given: "Laura"
+    container-title: "Statistica e Probabilità"
+    publisher: "EGEA"
+    issued:
+      year: 2014
 ---
 
 ```{r setup, include=FALSE}
@@ -103,7 +105,7 @@ Finally, we discuss some issues with the data, considering its unknown origin an
 
 ```{r package_installation}
 packages <- c("arm", "caret", "cluster", "corrplot", "dendextend", "doParallel", "dplyr", 
-              "GGally", "ggplot2", "glmnet", "gridExtra", "MASS", "patchwork", "parallel", 
+              "effects", "GGally", "ggplot2", "glmnet", "gridExtra", "MASS", "patchwork", "parallel", 
               "pROC", "ranger", "reshape2", "rpart", "rpart.plot", "splines")
 
 install_if_missing <- function(pkg) {
@@ -123,6 +125,7 @@ suppressMessages(library(corrplot))
 suppressMessages(library(dendextend))
 suppressMessages(library(doParallel))
 suppressMessages(library(dplyr))
+suppressMessages(library(effects))
 suppressMessages(library(GGally))
 suppressMessages(library(ggplot2))
 suppressMessages(library(glmnet))
@@ -1448,6 +1451,127 @@ binnedplot(pred,res, nclass = 1000)
 Including a polynomial term for `ap_hi` in our model, the strongly non-linear pattern seen in the residuals of the "vanilla" model seems to become sparser, even though there is still some unexplained variance in the plot. 
 All degrees of the polynomial for systolic blood pressure are significant, improving the model's fit. 
 
+
+#### Polynomial of degree 3
+```{r}
+# Cross-validation
+poly3 <- train(
+  cardio ~ . + poly(ap_hi, 3),   # Formula
+  data = train_data,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "ROC"            # Appropriate metric for classification
+)
+
+# General results
+poly3$results
+
+# Get predicted probabilities
+predictions <- predict(poly3, newdata = test_data, type = "prob")
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- test_data$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve_poly3 <- roc(actual_labels, predicted_probs)
+auc_poly3 <- auc(roc_curve_poly3)
+
+# Create confusion matrix
+cm <- confusionMatrix(
+  factor(predicted_class),
+  factor(actual_labels),
+  positive = "Yes"
+)
+
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+poly3_metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+
+# ROC curve
+plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
+```
+```{r}
+roc_curve_poly3$auc
+```
+
+#### Polynomial of degree 4
+```{r}
+# Cross-validation
+poly4 <- train(
+  cardio ~ . + poly(ap_hi, 4),   # Formula
+  data = train_data,             # Dataset
+  method = "glm",                # Correct method for logistic regression
+  family = binomial(link = "logit"),  # Logistic regression
+  trControl = ctrl,              # Cross-validation settings
+  metric = "ROC"            # Appropriate metric for classification
+)
+
+# General results
+poly4$results
+
+# Get predicted probabilities
+predictions <- predict(poly4, newdata = test_data, type = "prob")
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
+predicted_probs <- predictions[, "Yes"] 
+actual_labels <- test_data$cardio 
+
+# Manually compute the area under ROC curve
+roc_curve_poly4 <- roc(actual_labels, predicted_probs)
+auc_poly4 <- auc(roc_curve_poly4)
+
+# Create confusion matrix
+cm <- confusionMatrix(
+  factor(predicted_class),
+  factor(actual_labels),
+  positive = "Yes"
+)
+
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+poly4_metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
+# ROC curve
+plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
+```
+```{r}
+roc_curve_poly4$auc
+```
+
+
 #### LASSO
 
 It's possible to see that by considering the polynomials of the systolic blood pressure, the residuals follow less of a pattern. Further factors (like higher polynomials and multiple interactions) were also considered but they did not contribute to improving the model. 
@@ -1613,132 +1737,11 @@ plot(roc_curve_lasso, main = "ROC Curve for LASSO", col = "blue", lwd = 2)
 roc_curve_lasso$auc
 ```
 
-Lastly, let's fit the polynomial models this way as well
-
-#### Polynomial of degree 3
-```{r}
-# Cross-validation
-poly3 <- train(
-  cardio ~ . + poly(ap_hi, 3),   # Formula
-  data = train_data,             # Dataset
-  method = "glm",                # Correct method for logistic regression
-  family = binomial(link = "logit"),  # Logistic regression
-  trControl = ctrl,              # Cross-validation settings
-  metric = "ROC"            # Appropriate metric for classification
-)
-
-# General results
-poly3$results
-
-# Get predicted probabilities
-predictions <- predict(poly3, newdata = test_data, type = "prob")
-predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
-predicted_probs <- predictions[, "Yes"] 
-actual_labels <- test_data$cardio 
-
-# Manually compute the area under ROC curve
-roc_curve_poly3 <- roc(actual_labels, predicted_probs)
-auc_poly3 <- auc(roc_curve_poly3)
-
-# Create confusion matrix
-cm <- confusionMatrix(
-  factor(predicted_class),
-  factor(actual_labels),
-  positive = "Yes"
-)
-
-## Performance Metrics Calculation
-TN <- cm$table[1,1]
-FP <- cm$table[2,1]
-FN <- cm$table[1,2]
-TP <- cm$table[2,2]
-
-# Calculate metrics
-accuracy <- (TP + TN) / (TP + TN + FP + FN)
-precision <- TP / (TP + FP)
-recall <- TP / (TP + FN)  # Sensitivity
-specificity <- TN / (TN + FP)
-f1_score <- 2 * ((precision * recall) / (precision + recall))
-fpr <- FP / (FP + TN)
-fnr <- FN / (FN + TP)
-
-# Create a dataframe for visualization
-poly3_metrics_df <- data.frame(
-  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
-  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
-)
-
-# ROC curve
-plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
-```
-```{r}
-roc_curve_poly3$auc
-```
-
-#### Polynomial of degree 4
-```{r}
-# Cross-validation
-poly4 <- train(
-  cardio ~ . + poly(ap_hi, 4),   # Formula
-  data = train_data,             # Dataset
-  method = "glm",                # Correct method for logistic regression
-  family = binomial(link = "logit"),  # Logistic regression
-  trControl = ctrl,              # Cross-validation settings
-  metric = "ROC"            # Appropriate metric for classification
-)
-
-# General results
-poly4$results
-
-# Get predicted probabilities
-predictions <- predict(poly4, newdata = test_data, type = "prob")
-predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
-predicted_probs <- predictions[, "Yes"] 
-actual_labels <- test_data$cardio 
-
-# Manually compute the area under ROC curve
-roc_curve_poly4 <- roc(actual_labels, predicted_probs)
-auc_poly4 <- auc(roc_curve_poly4)
-
-# Create confusion matrix
-cm <- confusionMatrix(
-  factor(predicted_class),
-  factor(actual_labels),
-  positive = "Yes"
-)
-
-## Performance Metrics Calculation
-TN <- cm$table[1,1]
-FP <- cm$table[2,1]
-FN <- cm$table[1,2]
-TP <- cm$table[2,2]
-
-# Calculate metrics
-accuracy <- (TP + TN) / (TP + TN + FP + FN)
-precision <- TP / (TP + FP)
-recall <- TP / (TP + FN)  # Sensitivity
-specificity <- TN / (TN + FP)
-f1_score <- 2 * ((precision * recall) / (precision + recall))
-fpr <- FP / (FP + TN)
-fnr <- FN / (FN + TP)
-
-# Create a dataframe for visualization
-poly4_metrics_df <- data.frame(
-  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
-  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
-)
-# ROC curve
-plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
-```
-```{r}
-roc_curve_poly4$auc
-```
 
 ### Splines
 
 ```{r spline}
 set.seed(23)
-library(effects)
 fit <- glm(cardio ~ ns(age, df = 4) + ns(height, df = 4) + ns(weight, df = 4) + ns(ap_hi, df = 4) +
               ns(ap_lo, df = 4) + gender + cholesterol + gluc + smoke + alco + active, 
             data = train_data, family = binomial(link = "logit"))
@@ -1769,7 +1772,7 @@ spline_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Predic
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
-  labs(title = "Confusion Matrix: Logistic Regression with Splines (threshold = 0.4)", x = "Actual", y = "Predicted")
+  labs(title = "Confusion Matrix: Logistic Regression with Splines (threshold = 0.45)", x = "Actual", y = "Predicted")
 ggsave("images/spline_confusion_matrix.png", spline_confusion_matrix, width = 8, height = 8)
 spline_confusion_matrix
 
@@ -1942,9 +1945,9 @@ As it is shown above, the five main models get similar results in the task of cl
 
 Regarding the interpretation of the models, and based on the vanilla logistic regression, we can draw some interesting conclusions:
 
-1. On average, having cholesterol *well above normal* means that the difference in the log-odds of the probability of having a heart disease is $1.059$ compared to having a *normal* level. So the odds ratio amounts to $e^1.059 = 2.88$.
+1. On average, having cholesterol *well above normal* means that the difference in the log-odds of the probability of having a heart disease is $1.059$ compared to having a *normal* level. So the odds ratio amounts to $e^{1.059} = 2.88$.
 
-2. In the other hand, being physically active means that the difference in the log-odds of the probability of having a heart disease is $-0.229$ compared to having a *normal* level. So the odds ratio amounts to $e^0.229 = 0.80$, what results in a $20\%$ of probability less of having heart issues.
+2. In the other hand, being physically active means that the difference in the log-odds of the probability of having a heart disease is $-0.229$ compared to having a *normal* level. So the odds ratio amounts to $e^{-0.229} = 0.80$, what results in a $20\%$ of probability less of having heart issues.
 
 3. An increasing of the systolic or diastolic pressure can also negatively affect your health. For each augment in $10$ units to them (while fixing all the other values), we get odds ratios of $1.76$ and $1.10$ respectively. 
 
