@@ -546,14 +546,12 @@ Once again, there definitely are some significant differences between the groups
 ```{r}
 custom_colors <- c("darkviolet","orange", "#228b22")
 
-# Function to create plots
 create_plot <- function(color_var) {
   ggplot(cardio, aes(cardio, ap_hi)) +
     geom_boxplot(aes(color = !!sym(color_var))) +
     scale_color_manual(values = custom_colors) + theme_minimal()
 }
 
-# Generate plots
 p1 <- create_plot("cholesterol")
 p2 <- create_plot("age_cat")
 p3 <- create_plot("smoke")
@@ -1877,13 +1875,13 @@ ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   theme_minimal() +
   theme(legend.position = "bottom",
         legend.box = "horizontal",
-        legend.title = element_text(size = 8),  # Even smaller legend title size
-        legend.text = element_text(size = 6),   # Even smaller legend text size
-        legend.key.size = unit(0.6, "lines"),   # Reduce size of legend keys
-        legend.key.width = unit(0.8, "lines"),  # Reduce the width of the legend keys
-        legend.spacing.x = unit(0.5, "mm"),     # Reduce space between legend items
-        legend.spacing.y = unit(0.5, "mm")) +   # Reduce vertical space between items
-  guides(linetype = guide_legend(ncol = 2))  # Split the legend into two columns
+        legend.title = element_text(size = 8),  
+        legend.text = element_text(size = 6),  
+        legend.key.size = unit(0.6, "lines"),   
+        legend.key.width = unit(0.8, "lines"), 
+        legend.spacing.x = unit(0.5, "mm"),    
+        legend.spacing.y = unit(0.5, "mm")) +   
+  guides(linetype = guide_legend(ncol = 2))  
 ```
 
 
