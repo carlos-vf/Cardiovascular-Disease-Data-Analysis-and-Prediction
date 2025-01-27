@@ -73,8 +73,8 @@ The analysis is centered around the prediction of presence of cardiovascular dis
 
 ```{r package_installation}
 packages <- c("arm", "caret", "cluster", "corrplot", "dendextend", "doParallel", "dplyr", 
-              "GGally", "ggplot2", "glmnet", "gridExtra", "patchwork", "parallel", 
-              "pROC", "ranger", "reshape2", "rpart", "rpart.plot")
+              "GGally", "ggplot2", "glmnet", "gridExtra", "MASS", "patchwork", "parallel", 
+              "pROC", "ranger", "reshape2", "rpart", "rpart.plot", "splines")
 
 install_if_missing <- function(pkg) {
   if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
@@ -97,6 +97,7 @@ suppressMessages(library(GGally))
 suppressMessages(library(ggplot2))
 suppressMessages(library(glmnet))
 suppressMessages(library(gridExtra))
+suppressMessages(library(MASS))
 suppressMessages(library(parallel))
 suppressMessages(library(patchwork))
 suppressMessages(library(pROC))
@@ -104,6 +105,7 @@ suppressMessages(library(ranger))
 suppressMessages(library(reshape2))
 suppressMessages(library(rpart))
 suppressMessages(library(rpart.plot))
+suppressMessages(library(splines))
 ```
 
 ## Data exploration
@@ -969,6 +971,7 @@ roc_curve_rf <- roc(as.numeric(actual_labels), predicted_probs)
 
 # ROC curve
 plot(roc_curve_rf, main = "ROC Curve", col = "blue", lwd = 2)
+rf_auc <- auc(roc_curve_rf)
 
 # Save image
 png("images/rf_roc_curve.png", width = 800, height = 600)
@@ -1067,13 +1070,13 @@ fpr <- FP / (FP + TN)
 fnr <- FN / (FN + TP)
 
 # Create a dataframe for visualization
-metrics_df <- data.frame(
+rf_metrics_df <- data.frame(
   Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
   Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
 )
 
 # Print computed metrics
-print(metrics_df)
+print(rf_metrics_df)
 ```
 
 With this new value, not only the number of mispredictions was reduced, but also the error tendency was flipped. The new matrix shows how the model now overpredicts the disease, which is a safer option.
@@ -1182,6 +1185,7 @@ roc_curve_lr <- roc(actual_labels, predicted_probs)
 
 # ROC curve
 plot(roc_curve_lr, main = "ROC Curve", col = "blue", lwd = 2)
+lr_auc <- auc(roc_curve_lr)
 
 # Save image
 png("images/lr_roc_curve.png", width = 800, height = 600)
@@ -1278,13 +1282,13 @@ fpr <- FP / (FP + TN)
 fnr <- FN / (FN + TP)
 
 # Create a dataframe for visualization
-metrics_df <- data.frame(
+lr_metrics_df <- data.frame(
   Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
   Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
 )
 
 # Print computed metrics
-print(metrics_df)
+print(lr_metrics_df)
 ```
 
 Understanding the contribution of each feature to the model could also help us explain the model in more depth:
@@ -1558,6 +1562,7 @@ lasso_specificity <- conf_matrix$byClass["Specificity"]
 
 # Manually compute the area under ROC curve
 roc_curve_lasso <- roc(actual_labels, as.numeric(predictions))
+lasso_auc <- auc(roc_curve_lasso)
 
 # ROC curve
 plot(roc_curve_lasso, main = "ROC Curve for LASSO", col = "blue", lwd = 2)
@@ -1585,11 +1590,22 @@ poly3$results
 
 # Get predicted probabilities
 predictions <- predict(poly3, newdata = test_data, type = "prob")
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
 predicted_probs <- predictions[, "Yes"] 
 actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
 roc_curve_poly3 <- roc(actual_labels, predicted_probs)
+auc_poly3 <- auc(roc_curve_poly3)
+
+# Create confusion matrix
+conf_matrix <- confusionMatrix(
+  factor(predicted_class),
+  factor(actual_labels),
+  positive = "Yes"
+)
+poly3_sensitivity <- conf_matrix$byClass["Sensitivity"]
+poly3_specificity <- conf_matrix$byClass["Specificity"]
 
 # ROC curve
 plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
@@ -1616,11 +1632,22 @@ poly4$results
 
 # Get predicted probabilities
 predictions <- predict(poly4, newdata = test_data, type = "prob")
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
 predicted_probs <- predictions[, "Yes"] 
 actual_labels <- test_data$cardio 
 
 # Manually compute the area under ROC curve
 roc_curve_poly4 <- roc(actual_labels, predicted_probs)
+auc_poly4 <- auc(roc_curve_poly4)
+
+# Create confusion matrix
+conf_matrix <- confusionMatrix(
+  factor(predicted_class),
+  factor(actual_labels),
+  positive = "Yes"
+)
+poly4_sensitivity <- conf_matrix$byClass["Sensitivity"]
+poly4_specificity <- conf_matrix$byClass["Specificity"]
 
 # ROC curve
 plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
@@ -1634,11 +1661,6 @@ roc_curve_poly4$auc
 
 ```{r spline}
 set.seed(23)
-
-library(splines)
-library(MASS)
-library(caret)
-library(pROC)
 
 fit <- glm(cardio ~ ns(age, df = 4) + ns(height, df = 4) + ns(weight, df = 4) + ns(ap_hi, df = 4) +
               ns(ap_lo, df = 4) + gender + cholesterol + gluc + smoke + alco + active, 
@@ -1657,7 +1679,7 @@ arm::binnedplot(pred, res, nclass = 1000)
 
 ```{r spline_2}
 predicted_probs <- predict(fit_step, newdata = test_data, type = "response")
-predicted_class <- ifelse(predicted_probs >= 0.4, "Yes", "No")
+predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
 actual_labels <- test_data$cardio
 cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
@@ -1676,7 +1698,7 @@ lr_confusion_matrix
 
 roc_curve_splines <- roc(actual_labels, predicted_probs)
 plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
-auc_spline <- auc(roc_curve)
+auc_spline <- auc(roc_curve_splines)
 print(auc_spline)
 png("images/roc_curve_splines.png", width = 800, height = 600)
 plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
@@ -1701,7 +1723,7 @@ splines_metrics_df <- data.frame(
   Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr, fnr_fpr_ratio)
 )
 
-print(metrics_df)
+print(splines_metrics_df)
 ```
 
 
@@ -1735,37 +1757,37 @@ grid_full$alco <- factor(grid_full$alco, levels = levels(train_data$alco))
 grid_full$active <- factor(grid_full$active, levels = levels(train_data$active))
 
 grid_full$predicted_probs <- predict(fit_step, newdata = grid_full, type = "response")
-grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.5, "Yes", "No")
+grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.4, "Yes", "No")
 
 # Add new data for "well above normal" cholesterol
 grid_well_above <- grid_full
 grid_well_above$cholesterol <- "well above normal"
 grid_well_above$predicted_probs <- predict(fit_step, newdata = grid_well_above, type = "response")
-grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.5, "Yes", "No")
+grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.4, "Yes", "No")
 
 # Add new data for "above normal" cholesterol
 grid_above_normal <- grid_full
 grid_above_normal$cholesterol <- "above normal"
 grid_above_normal$predicted_probs <- predict(fit_step, newdata = grid_above_normal, type = "response")
-grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.5, "Yes", "No")
+grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.4, "Yes", "No")
 
 # Add new data for "normal" cholesterol (this is the default scenario)
 grid_normal <- grid_full
 grid_normal$cholesterol <- "normal"
 grid_normal$predicted_probs <- predict(fit_step, newdata = grid_normal, type = "response")
-grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.5, "Yes", "No")
+grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.4, "Yes", "No")
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
-  geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), linewidth = 2) + 
+  geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
-               color = "black", size = 1, breaks = 0.5) +
+               color = "black", linewidth = 1, breaks = 0.4) +
   geom_contour(data = grid_above_normal, aes(z = predicted_probs, linetype = "Above Normal"), 
-               color = "gray25", size = 1, breaks = 0.5) +
+               color = "gray25", linewidth = 1, breaks = 0.4) +
   geom_contour(data = grid_normal, aes(z = predicted_probs, linetype = "Normal"), 
-               color = "gray95", size = 1, breaks = 0.5) +
+               color = "gray95", linewidth = 1, breaks = 0.4) +
   labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels (t=0.4)",
        x = "ap_hi", y = "ap_lo", color = "Cardio Outcome", linetype = "Cholesterol Level") +
   scale_linetype_manual(values = c("Normal" = "solid", "Above Normal" = "solid", "Well Above Normal" = "solid")) +
@@ -1812,27 +1834,27 @@ dev.off()
 results <- data.frame(
   Model = c("Random Forest", "Basic Logistic Regression", "LASSO", "Polynomial Regression 3", "Polynomial Regression 4", "Splines"),
   AUC = c(
-    rf_model$results$ROC,
-    log_model$results$ROC,
-    roc_curve_lasso$auc,
-    poly3$results$ROC,
-    poly4$results$ROC,
+    rf_auc,
+    lr_auc,
+    lasso_auc,
+    auc_poly3,
+    auc_poly4,
     auc_spline
   ),
   Sensitivity = c(
-    rf_model$results$Sens,
-    log_model$results$Sens,
+    rf_metrics_df$Value[rf_metrics_df$Metric == "Recall (Sensitivity)"],
+    lr_metrics_df$Value[lr_metrics_df$Metric == "Recall (Sensitivity)"],
     lasso_sensitivity,
-    poly3$results$Sens,
-    poly4$results$Sens,
+    poly3_sensitivity,
+    poly4_sensitivity,
     splines_metrics_df$Value[splines_metrics_df$Metric == "Recall (Sensitivity)"]
   ),
   Specificity = c(
-    rf_model$results$Spec,
-    log_model$results$Spec,
+    rf_metrics_df$Value[rf_metrics_df$Metric == "Specificity"],
+    lr_metrics_df$Value[lr_metrics_df$Metric == "Specificity"],
     lasso_specificity,
-    poly3$results$Spec,
-    poly4$results$Spec,
+    poly3_specificity,
+    poly4_specificity,
     splines_metrics_df$Value[splines_metrics_df$Metric == "Specificity"]
   )
 )
@@ -1847,7 +1869,7 @@ Regarding the interpretation of the models, and based on the vanilla logistic re
 
 2. In the other hand, being physically active means that the difference in the log-odds of the probability of having a heart disease is $-0.229$ compared to having a *normal* level. So the odds ratio amounts to $e^0.229 = 0.80$, what results in a $20\%$ of probability less of having heart issues.
 
-3. An increasing of the systolic or diastolic pressure can also negatively affect your health. For each augment in $10$ units to them, we get odds ratios of $1.76$ and $1.10$ respectively. 
+3. An increasing of the systolic or diastolic pressure can also negatively affect your health. For each augment in $10$ units to them (while fixing all the other values), we get odds ratios of $1.76$ and $1.10$ respectively. 
 
 
 ## References
