@@ -1661,7 +1661,7 @@ roc_curve_poly4$auc
 
 ```{r spline}
 set.seed(23)
-
+library(effects)
 fit <- glm(cardio ~ ns(age, df = 4) + ns(height, df = 4) + ns(weight, df = 4) + ns(ap_hi, df = 4) +
               ns(ap_lo, df = 4) + gender + cholesterol + gluc + smoke + alco + active, 
             data = train_data, family = binomial(link = "logit"))
@@ -1672,6 +1672,7 @@ summary(fit_step)
 
 pred <- predict(fit_step, type = "response")
 res <- residuals(fit_step, type = "response")
+plot(allEffects(fit_step))
 
 arm::binnedplot(pred, res, nclass = 1000)
 ```
@@ -1682,19 +1683,18 @@ predicted_probs <- predict(fit_step, newdata = test_data, type = "response")
 predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
 actual_labels <- test_data$cardio
 cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
-
 cm_table <- as.data.frame(cm$table)
 cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
-lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+spline_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
   labs(title = "Confusion Matrix: Logistic Regression with Splines (threshold = 0.4)", x = "Actual", y = "Predicted")
-ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
-lr_confusion_matrix
+ggsave("images/spline_confusion_matrix.png", spline_confusion_matrix, width = 8, height = 8)
+spline_confusion_matrix
 
 roc_curve_splines <- roc(actual_labels, predicted_probs)
 plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
@@ -1757,25 +1757,25 @@ grid_full$alco <- factor(grid_full$alco, levels = levels(train_data$alco))
 grid_full$active <- factor(grid_full$active, levels = levels(train_data$active))
 
 grid_full$predicted_probs <- predict(fit_step, newdata = grid_full, type = "response")
-grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.4, "Yes", "No")
+grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.45, "Yes", "No")
 
 # Add new data for "well above normal" cholesterol
 grid_well_above <- grid_full
 grid_well_above$cholesterol <- "well above normal"
 grid_well_above$predicted_probs <- predict(fit_step, newdata = grid_well_above, type = "response")
-grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.4, "Yes", "No")
+grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.45, "Yes", "No")
 
 # Add new data for "above normal" cholesterol
 grid_above_normal <- grid_full
 grid_above_normal$cholesterol <- "above normal"
 grid_above_normal$predicted_probs <- predict(fit_step, newdata = grid_above_normal, type = "response")
-grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.4, "Yes", "No")
+grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.45, "Yes", "No")
 
 # Add new data for "normal" cholesterol (this is the default scenario)
 grid_normal <- grid_full
 grid_normal$cholesterol <- "normal"
 grid_normal$predicted_probs <- predict(fit_step, newdata = grid_normal, type = "response")
-grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.4, "Yes", "No")
+grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.45, "Yes", "No")
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
@@ -1783,12 +1783,12 @@ ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
-               color = "black", linewidth = 1, breaks = 0.4) +
+               color = "black", linewidth = 1, breaks = 0.45) +
   geom_contour(data = grid_above_normal, aes(z = predicted_probs, linetype = "Above Normal"), 
-               color = "gray25", linewidth = 1, breaks = 0.4) +
+               color = "gray25", linewidth = 1, breaks = 0.45) +
   geom_contour(data = grid_normal, aes(z = predicted_probs, linetype = "Normal"), 
-               color = "gray95", linewidth = 1, breaks = 0.4) +
-  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels (t=0.4)",
+               color = "gray95", linewidth = 1, breaks = 0.45) +
+  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels (t=0.45)",
        x = "ap_hi", y = "ap_lo", color = "Cardio Outcome", linetype = "Cholesterol Level") +
   scale_linetype_manual(values = c("Normal" = "solid", "Above Normal" = "solid", "Well Above Normal" = "solid")) +
   theme_minimal() +
