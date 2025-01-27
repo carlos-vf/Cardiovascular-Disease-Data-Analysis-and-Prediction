@@ -117,6 +117,22 @@ references:
       - "978-0-387-84857-0"
       - "978-0-387-84858-7"
     DOI: "https://doi.org/10.1007/978-0-387-84858-7"
+    
+  - id: malone2010pulse
+    title: "Pulse Pressure. Why is it Important?"
+    author:
+      - family: "Malone"
+        given: "AF"
+      - family: "Reddan"
+        given: "DN"
+    container-title: "Peritoneal Dialysis International"
+    volume: 30
+    issue: 3
+    page: "265-268"
+    issued:
+      year: 2010
+    DOI: "10.3747/pdi.2010.00002"
+
 ---
 
 ```{r setup, include=FALSE}
@@ -682,6 +698,7 @@ cardio_pl = ggplot(cardio, aes(ap_hi, ap_lo, color = cardio)) +
   labs(title = "K-Means Clustering (ap_hi vs ap_lo)")
 grid.arrange(cl_p3, cardio_pl)
 ```
+
 There is a split, but a lot of clusters overlap for central values.
 ```{r}
 cluster_summary_ON <- cardio %>%
@@ -816,7 +833,7 @@ cardio$age_cat <- NULL
 
 In order to correctly fit the random forest model, let's analyze first some simpler classifiers: classification trees. 
 
-For this models, as well as for the following ones, dataset will be split in two parts: 80% for training the model and 20% for validation. 
+For this models, as well as for the following ones, dataset will be split in two parts: 80% for training the model and 20% for testing. 
 
 ```{r classification trees (high cp) 1}
 # Split data (train/test)
@@ -1220,12 +1237,13 @@ ggsave("images/decision_boundary_cardio.png", decision_boundary, width = 8, heig
 # Display the plot
 decision_boundary
 ```
+
 Even though some red and green points are misclassified, the great majority are correctly predicted. We can see how both pressures play a significant role in determining the probability of having a cardio disease, providing complementary information for classification.
 
 
 ### Performance
 
-Let's compute some performance metric:
+Let's compute some performance metrics:
 ```{r log_model_performance}
 # Get predicted probabilities
 predictions <- predict(log_model, newdata = test_data, type = "prob")
@@ -1339,7 +1357,7 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
-Understanding the contribution of each feature to the model could also help us explain the model in more depth.
+Understanding the contribution of each feature to the model could also help us explain the model in more depth:
 ```{r lr-feature-importance}
 # Feature Importance
 summary(log_model)
@@ -1366,36 +1384,48 @@ feature_importance
 It is important to note that the plot compares categorical and numerical values. Scales are completely different (an increment of one unit in `cholesterol`, for example, is much more significant than the same increment in `ap_hi`). However, we can distinguish in an easy way which variables contribute positively or negatively to the prediction.
 
 
-### Interaction between Variables
+### Interaction between variables
 
 #### Smoke & Alcohol Model
+
+What if we introduce interaction between some of the variables? As we saw before, some pairs of features are highly correlated, e.g., `smoke` and `alco` or `gluc` and `cholesterol`. A reasonable approach could be building some models based on them.
 ```{r}
 smoke_check = glm(cardio ~ smoke + alco, data = train_data, family = binomial(link = "logit") )
 summary(smoke_check)
 ```
-Even if taken as the single predictor, it still counterintuitively contributes negatively to `cardio`. However the significance is lower than that in the complete model.
-In the data exploration part, we saw that there were, numerically, minimal differences between groups with regard do this variable. 
-Furthermore both of these variables are *subjective*, meaning that the answer was at the respondent's discretion. This means one could straight up lie, or even, having quit recently, answer *no* even though the effects of alcohol consumption or smoking were already present. 
+
+Even if taken as the single predictor, they still counterintuitively contribute negatively to `cardio`. However the significance is lower than the one in the complete model.
+
+In the data exploration part, we saw that there were, numerically, minimal differences between groups with regard to these variables. Furthermore both of these variables are *subjective*, meaning that the answer was at the respondent's discretion. This means one could straight up lie, or even, having quit recently, answer *no* even though the effects of alcohol consumption or smoking were already present. That is a fact to be taken into consideration.
+
 
 #### Glucose & Cholesterol Model
+
+Let's try with the second pair of variables.
 ```{r}
 gluc_check = glm(cardio ~ gluc + cholesterol, data = train_data, family = binomial(link = "logit"))
 summary(gluc_check)
 ```
+
 High levels of cholesterol are positively correlated with high glucose, as expected.
 ```{r}
 interaction_gluc_cardio = glm(cardio ~ gluc*cholesterol, data = train_data, family = binomial(link = "logit"))
 summary(interaction_gluc_cardio)
 ```
-The weird effect is present just on levels of `gluc` above normal when they interact with high cholesterol. Taken individually, when they are significant, they contribute positively to the insurgence of heart diseases, as expected.  
+
+The weird effect is present just on levels of `gluc` *above normal* when they interact with high cholesterol. Taken individually, when they are significant, they contribute positively to the insurgence of heart diseases, as expected.  
+
 
 #### Pulse Pressure Model
-We create a new variable, named *pulse pressure*, that combines the pressure measurements. $ap\_pu = ap\_hi - ap\_lo$.
+
+It would be interesting to work with *pulse pressure* too. It is an important mortality predictor and, according to some researchers, it appears to be a stronger independent predictor of mortality than other parameters such as systolic or diastolic pressures by themselves [@malone2010pulse]. 
+
+Pulse pressure is a function consisting on the difference of systolic and diastolic pressures: $ap\_pu = ap\_hi - ap\_lo$.
 
 ```{r}
 cardio_cl$ap_pu = cardio$ap_hi - cardio$ap_lo
 log_model_ap_pu <- train(
-  cardio ~ . -ap_hi-ap_lo,                    # Formula
+  cardio ~ . -ap_hi-ap_lo,       # Formula
   data = train_data,             # Dataset
   method = "glm",                # Correct method for logistic regression
   family = binomial(link = "logit"),  # Logistic regression
@@ -1407,6 +1437,7 @@ print(log_model_ap_pu)
 summary(log_model_ap_pu)
 ```
 
+Nevertheless, results seem to be similar, if not worse, compared with previous models.
 
 
 ### Polynomial Regressions
