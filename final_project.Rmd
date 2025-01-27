@@ -637,11 +637,13 @@ table(cardio$Cluster_ON)
 ```{r}
 # Visualize the clusters across different dimensions
 cl_p1 = ggplot(cardio, aes(cardio, ap_hi, color = Cluster_ON)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (cardio vs ap_hi)")
+  geom_point(size = 0.8, alpha = 0.8) +  
+  labs(title = "K-Means Clustering (cardio vs ap_hi)") + 
+  geom_jitter(width = 0.25, size = 0.8, alpha = 0.8)  
+
 cl_p2 = ggplot(cardio, aes(cardio, ap_lo, color = Cluster_ON)) +
-  geom_point() +
-  labs(title = "K-Means Clustering (cardio vs ap_lo)")
+  geom_point(size = 0.8, alpha = 0.8) +  
+  labs(title = "K-Means Clustering (cardio vs ap_lo)") + geom_jitter(width = 0.25, size = 0.8, alpha = 0.8) 
 
 grid.arrange(cl_p1, cl_p2)
 ```
