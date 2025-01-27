@@ -1740,7 +1740,9 @@ roc_curve_lasso$auc
 
 ### Splines
 
-```{r spline}
+We now try a more complicated model for the logistic regression, with the usage of natural splines over the categorical variables, and perform a stepwise regression based on the AIC. [@tibshirani2009elements]
+
+```{r spline, fig.width=12, fig.height=10}
 set.seed(23)
 fit <- glm(cardio ~ ns(age, df = 4) + ns(height, df = 4) + ns(weight, df = 4) + ns(ap_hi, df = 4) +
               ns(ap_lo, df = 4) + gender + cholesterol + gluc + smoke + alco + active, 
