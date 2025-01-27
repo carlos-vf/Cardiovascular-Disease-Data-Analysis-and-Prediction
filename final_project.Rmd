@@ -1755,7 +1755,8 @@ summary(fit_step)
 pred <- predict(fit_step, type = "response")
 res <- residuals(fit_step, type = "response")
 plot(allEffects(fit_step))
-
+```
+```{r}
 arm::binnedplot(pred, res, nclass = 1000)
 ```
 
