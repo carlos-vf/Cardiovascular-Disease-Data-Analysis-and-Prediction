@@ -219,7 +219,7 @@ cardio <- cardio[!(cardio$ap_hi < 25 | cardio$ap_hi > 400 | cardio$ap_lo <  10| 
 In order to make data more understandable, we will transform the age (currently in days) to years.
 
 ```{r}
-cardio$age = floor(cardio$age/365)
+cardio$age = cardio$age/365
 summary(cardio$age)
 ggplot(cardio, aes(y = age)) +
   geom_boxplot(fill = "skyblue", color = "black") + labs(
@@ -609,7 +609,7 @@ While no group shows a clean division with respect to `cardio`, values of both `
 
 ## Cluster analysis
 
-We proceed by performing cluster analysis. Due to the nature of data, and various experiments with the results, we considered 2 different approaches:
+We proceed by performing cluster analysis. Due to the nature of data, and various experiments with the results, we considered two different approaches:
 
 - Considering all the variables, but scaling just the numerical ones.
 - Scaling and considering just numerical variables.
@@ -805,6 +805,7 @@ Now one can clearly see how the clusters different in terms of health: there is 
 ```{r remove cluster labels}
 cardio$Cluster <- NULL
 cardio$Cluster_ON <- NULL
+cardio$age_cat <- NULL
 ```
 
 
@@ -815,14 +816,11 @@ cardio$Cluster_ON <- NULL
 
 In order to correctly fit the random forest model, let's analyze first some simpler classifiers: classification trees. 
 
-Firstly proposed by [@breiman1984classification], decision trees (or classification trees, when dealing with a discrete target variable) are unsupervised learning algorithms. The idea consists on recursively partition the feature space and assign a label to each resulting partition. The tree is then used to classify future points according to these splits and labels. The key advantage of decision trees over other methods is their high interpretability, a quality usually wanted when working in fields like healthcare [@bertsimas2017optimal].
-
-The dataset will be split in two parts: 80% for training the model and 20% for validation. 
+For this models, as well as for the following ones, dataset will be split in two parts: 80% for training the model and 20% for validation. 
 
 ```{r classification trees (high cp) 1}
 # Split data (train/test)
 set.seed(123)
-cardio$age_cat <- NULL
 train_index <- sample(1:nrow(cardio), 0.8 * nrow(cardio))  
 train_data <- cardio[train_index, ]
 test_data <- cardio[-train_index, ]
@@ -947,8 +945,6 @@ After evaluating both models, we get a sightly better accuracy from a significan
 
 Following classification trees, a natural approximation is fitting a random forest model. 
 
-Introduced by [@breiman2001random], and explored by many other authors as [@hastie2009elements], Random Forest is an ensemble machine learning algorithm primarily used for classification and regression tasks. It operates by constructing a multitude of decision trees during training and outputs the mode of the classes (for classification) or the mean/average prediction (for regression) of the individual trees. It is a robust and versatile method that can handle non-linear relationships, large datasets, and high-dimensional data with ease.
-
 Since the trees that make up the model are completely independent and in order to speed up the training, the problem may be parallelized. Let's set it up:
 
 ```{r parellization}
@@ -1060,8 +1056,6 @@ ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height 
 rf_confusion_matrix
 ```
 
-
-
 ```{r rf_model_other_metrics}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
@@ -1088,7 +1082,9 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
-As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones. \
+As we could imagine, this enhanced version of classification trees gets a better performance in the classification task. However, we must take into account the high computational complexity of this new model compared with the previous ones.
+
+If we observe the confusion matrix above, we easily realize that the model tends to underpredict the disease. Given the healthcare context in which we are, a lower threshold for the matrix should also be taken into account.
 
 ```{r rf_model_confusion_matrix_OTHER_THRESHOLD}
 ## Confusion Matrix for Random Forest
@@ -1136,6 +1132,7 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
+With this new value, not only the number of mispredictions was reduced, but also the error tendency was flipped. The new matrix shows how the model now overpredicts the disease, which is a safer option.
 
 
 
@@ -1143,7 +1140,11 @@ print(metrics_df)
 
 ### Basic Model
 
-```{r}
+Another interesting approach to the problem could be fitting some logistic regression models. These models are mainly used when the target variable is dichotomous, as in this case, where only two classes can be predicted (0/1).
+
+Let's start building a general model, without interaction between variables. Again, a 5-fold cross-validation will be applied.
+
+```{r basic_logistic_regression}
 ctrl <- trainControl(method = "cv", number = 5, classProbs = TRUE, summaryFunction = twoClassSummary) 
 levels(cardio$cardio) <- c("No", "Yes")
 levels(train_data$cardio) <- c("No", "Yes")
@@ -1160,11 +1161,13 @@ log_model <- train(
   metric = "ROC"            # Appropriate metric for classification
 )
 
-# Print and summarize the model
+# Print the model
 print(log_model)
-summary(log_model)
 ```
 
+At first sight, the results obtained are pretty similar to the ones from the previous model. 
+
+Let's plot the decision boundary with respect `ap_hi` and `ap_lo` to better see the relation between both variables:
 ```{r lr_decision_boundaries}
 grid <- expand.grid(
   ap_hi = seq(min(test_data$ap_hi), max(test_data$ap_hi), length.out = 200),
@@ -1217,10 +1220,12 @@ ggsave("images/decision_boundary_cardio.png", decision_boundary, width = 8, heig
 # Display the plot
 decision_boundary
 ```
+Even though some red and green points are misclassified, the great majority are correctly predicted. We can see how both pressures play a significant role in determining the probability of having a cardio disease, providing complementary information for classification.
 
 
 ### Performance
 
+Let's compute some performance metric:
 ```{r log_model_performance}
 # Get predicted probabilities
 predictions <- predict(log_model, newdata = test_data, type = "prob")
@@ -1238,9 +1243,6 @@ png("images/lr_roc_curve.png", width = 800, height = 600)
 plot(roc_curve_lr, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
 ```
-
-There are several seemingly weird effects in this model:
-- a very high level of glucose, smoking and drinking alcohol all REDUCE the incidence of heart disease.
 
 ```{r log_model_confusion_matrix}
 ## Confusion Matrix for Logistic Regression
@@ -1261,7 +1263,6 @@ lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Prediction, y = Reference
 ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
 lr_confusion_matrix
 ```
-
 
 ```{r lg_model_other_metrics}
 ## Performance Metrics Calculation
@@ -1290,7 +1291,7 @@ print(metrics_df)
 ratio <- metrics_df$Value[7]/metrics_df$Value[6]
 ```
 
-The False Positive Rate (FPR) is higher than the False Negative Rate (FPR) by a factor of $1.25$. Considering the medical context, we try to lower the threshold to see if we can balance the ratio without losing too much in terms of accuracy. 
+The False Positive Rate (FPR) is higher than the False Negative Rate (FPR) by a factor of $1.25$. Considering the medical context, we again try to lower the threshold to see if we can balance the ratio without losing too much in terms of accuracy. 
 
 ```{r log_model_confusion_matrix_OTHER_TRESHOLD}
 ## Confusion Matrix for Logistic Regression
@@ -1338,9 +1339,10 @@ metrics_df <- data.frame(
 print(metrics_df)
 ```
 
-
+Understanding the contribution of each feature to the model could also help us explain the model in more depth.
 ```{r lr-feature-importance}
 # Feature Importance
+summary(log_model)
 importance_lr <- as.data.frame(summary(log_model)$coefficients)
 importance_lr$Feature <- rownames(importance_lr)
 
@@ -1354,19 +1356,14 @@ colnames(importance_lr) <- c("Estimate", "StdError", "ZValue", "PValue", "Featur
 feature_importance <- ggplot(importance_lr, aes(x=reorder(Feature, Estimate), y=Estimate)) +
   geom_bar(stat='identity', fill='steelblue') +
   coord_flip() +
-  labs(title="Coefficient Value - Logistic Regression",
+  labs(title="Coefficient Contribution - Logistic Regression",
        x="Feature", y="Value)") +
   theme_minimal()
 ggsave("images/feature_importance.png", feature_importance, width = 8, height = 8)
 feature_importance
 ```
 
-We plot the absolute magnitude of every variable. The results are puzzling: cholesterol has very high importance, while pressure measurements matter much less than expected.
-We hypothesize that this could be due to some sort of "correspondence" or "multicollinearity" between some variables:
-- `gluc` and `cholesterol`
-- `smoke` and `alco`
-
-Let's now further investigate the relationship between some of the variables and heart disease
+It is important to note that the plot compares categorical and numerical values. Scales are completely different (an increment of one unit in `cholesterol`, for example, is much more significant than the same increment in `ap_hi`). However, we can distinguish in an easy way which variables contribute positively or negatively to the prediction.
 
 
 ### Interaction between Variables
@@ -1793,7 +1790,7 @@ grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.5, "Yes",
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
-  geom_point(data = train_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
+  geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
