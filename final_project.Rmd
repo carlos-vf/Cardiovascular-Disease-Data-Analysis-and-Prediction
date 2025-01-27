@@ -57,6 +57,34 @@ references:
     issued:
       year: 2010
     DOI: "10.3747/pdi.2010.00002"
+  - id: tibshirani2009elements
+  title: "The Elements of Statistical Learning: Data Mining, Inference, and Prediction"
+  author:
+    - family: "Hastie"
+      given: "Trevor"
+    - family: "Tibshirani"
+      given: "Robert"
+    - family: "Friedman"
+      given: "Jerome"
+  container-title: "Springer Series in Statistics"
+  edition: 2
+  publisher: "Springer"
+  issued:
+    year: 2009
+  DOI: "10.1007/978-0-387-84858-7"
+- id: grigoletto2014modello
+  title: "Modello Lineare: Teoria e Applicazioni con R"
+  author:
+    - family: "Grigoletto"
+      given: "Matteo"
+    - family: "Pauli"
+      given: "Francesco"
+    - family: "Ventura"
+      given: "Laura"
+  container-title: "Statistica e Probabilità"
+  publisher: "EGEA"
+  issued:
+    year: 2014
 ---
 
 ```{r setup, include=FALSE}
@@ -1378,7 +1406,7 @@ Nevertheless, results seem to be similar, if not worse, compared with previous m
 
 #### Residuals
 
-Let's check the residual plots:
+Let's check the residual plots, using binned residuals:
 ```{r original_residuals 1}
 fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
 pred <- predict(fit, type = "response")
@@ -1386,15 +1414,6 @@ res <- residuals(fit, type = "response")
 
 cardio$cardio <- factor(cardio$cardio, levels = c("No", "Yes"), labels = c(0, 1))
 
-pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit$fitted.values*(1 - fit$fitted.values))
-plot(cardio$ap_hi, pearson_residuals)
-```
-
-This graph shows *Pearson residuals*, which are the equivalent of standardized residuals for GLMs.
-
-We can see that they are larger at the extremes. They correspond to the points we previously pointed out in the scatter plot, which represent either individuals with low blood pressure who present a heart disease, or those with high blood pressure who don't have any disease. 
-
-```{r original_residuals 2}
 binnedplot(pred,res, nclass = 1000)
 ```
 
@@ -1406,9 +1425,9 @@ fit_poly3 <- glm(cardio ~ .+poly(ap_hi, 3), data = cardio, family = binomial(lin
 pred <- predict(fit_poly3, type = "response")
 res <- residuals(fit_poly3, type = "response")
 summary(fit_poly3)
-pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit_poly3$fitted.values*(1 - fit_poly3$fitted.values))
-plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
+```
 
+```{r}
 binnedplot(pred,res, nclass = 1000)
 ```
 
@@ -1418,13 +1437,14 @@ fit_poly4 <- glm(cardio ~ .+poly(ap_hi, 4), data = cardio, family = binomial(lin
 pred <- predict(fit_poly4, type = "response")
 res <- residuals(fit_poly4, type = "response")
 summary(fit_poly4)
-pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit_poly4$fitted.values)/sqrt(fit_poly4$fitted.values*(1 - fit_poly4$fitted.values))
-plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
-
-binnedplot(pred,res, nclass = 1000)
-br <- arm::binned.resids(pred,res)
 ```
 
+```{r}
+binnedplot(pred,res, nclass = 1000)
+```
+
+Including a polynomial term for `ap_hi` in our model, the strongly non-linear pattern seen in the residuals of the "vanilla" model seems to become sparser, even though there is still some unexplained variance in the plot. 
+All degrees of the polynomial for systolic blood pressure are significant, improving the model's fit. 
 
 #### LASSO
 
@@ -1453,6 +1473,7 @@ plot(cvfit)
 ```{r}
 print(cvfit)
 ```
+
 By using a $\lambda$ which produces a misclassification error within 1 standard error from the minimum's, we obtain similar results, while also simplifying the model: those problematic coefficients from before are shrunk to 0, underlying their secondary importance in determining the presence of heart disease. This is indeed consistent with what we had supposed in our initial exploration of the data. 
 
 ```{r}
@@ -1655,7 +1676,6 @@ plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
 ```{r}
 roc_curve_poly4$auc
 ```
-
 
 ### Splines
 
