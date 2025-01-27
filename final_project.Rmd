@@ -57,6 +57,34 @@ references:
     issued:
       year: 2010
     DOI: "10.3747/pdi.2010.00002"
+  - id: tibshirani2009elements
+  title: "The Elements of Statistical Learning: Data Mining, Inference, and Prediction"
+  author:
+    - family: "Hastie"
+      given: "Trevor"
+    - family: "Tibshirani"
+      given: "Robert"
+    - family: "Friedman"
+      given: "Jerome"
+  container-title: "Springer Series in Statistics"
+  edition: 2
+  publisher: "Springer"
+  issued:
+    year: 2009
+  DOI: "10.1007/978-0-387-84858-7"
+- id: grigoletto2014modello
+  title: "Modello Lineare: Teoria e Applicazioni con R"
+  author:
+    - family: "Grigoletto"
+      given: "Matteo"
+    - family: "Pauli"
+      given: "Francesco"
+    - family: "Ventura"
+      given: "Laura"
+  container-title: "Statistica e Probabilità"
+  publisher: "EGEA"
+  issued:
+    year: 2014
 ---
 
 ```{r setup, include=FALSE}
@@ -1380,7 +1408,7 @@ Nevertheless, results seem to be similar, if not worse, compared with previous m
 
 #### Residuals
 
-Let's check the residual plots:
+Let's check the residual plots, using binned residuals:
 ```{r original_residuals 1}
 fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
 pred <- predict(fit, type = "response")
@@ -1388,15 +1416,6 @@ res <- residuals(fit, type = "response")
 
 cardio$cardio <- factor(cardio$cardio, levels = c("No", "Yes"), labels = c(0, 1))
 
-pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit$fitted.values*(1 - fit$fitted.values))
-plot(cardio$ap_hi, pearson_residuals)
-```
-
-This graph shows *Pearson residuals*, which are the equivalent of standardized residuals for GLMs.
-
-We can see that they are larger at the extremes. They correspond to the points we previously pointed out in the scatter plot, which represent either individuals with low blood pressure who present a heart disease, or those with high blood pressure who don't have any disease. 
-
-```{r original_residuals 2}
 binnedplot(pred,res, nclass = 1000)
 ```
 
@@ -1408,9 +1427,9 @@ fit_poly3 <- glm(cardio ~ .+poly(ap_hi, 3), data = cardio, family = binomial(lin
 pred <- predict(fit_poly3, type = "response")
 res <- residuals(fit_poly3, type = "response")
 summary(fit_poly3)
-pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit$fitted.values)/sqrt(fit_poly3$fitted.values*(1 - fit_poly3$fitted.values))
-plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
+```
 
+```{r}
 binnedplot(pred,res, nclass = 1000)
 ```
 
@@ -1420,13 +1439,14 @@ fit_poly4 <- glm(cardio ~ .+poly(ap_hi, 4), data = cardio, family = binomial(lin
 pred <- predict(fit_poly4, type = "response")
 res <- residuals(fit_poly4, type = "response")
 summary(fit_poly4)
-pearson_residuals <- (as.numeric(as.character(cardio$cardio)) - fit_poly4$fitted.values)/sqrt(fit_poly4$fitted.values*(1 - fit_poly4$fitted.values))
-plot(cardio$ap_hi, pearson_residuals, ylim = c(-10,10))
-
-binnedplot(pred,res, nclass = 1000)
-br <- arm::binned.resids(pred,res)
 ```
 
+```{r}
+binnedplot(pred,res, nclass = 1000)
+```
+
+Including a polynomial term for `ap_hi` in our model, the strongly non-linear pattern seen in the residuals of the "vanilla" model seems to become sparser, even though there is still some unexplained variance in the plot. 
+All degrees of the polynomial for systolic blood pressure are significant, improving the model's fit. 
 
 #### LASSO
 
@@ -1455,6 +1475,7 @@ plot(cvfit)
 ```{r}
 print(cvfit)
 ```
+
 By using a $\lambda$ which produces a misclassification error within 1 standard error from the minimum's, we obtain similar results, while also simplifying the model: those problematic coefficients from before are shrunk to 0, underlying their secondary importance in determining the presence of heart disease. This is indeed consistent with what we had supposed in our initial exploration of the data. 
 
 ```{r}
@@ -1713,12 +1734,11 @@ plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
 roc_curve_poly4$auc
 ```
 
-
 ### Splines
 
 ```{r spline}
 set.seed(23)
-
+library(effects)
 fit <- glm(cardio ~ ns(age, df = 4) + ns(height, df = 4) + ns(weight, df = 4) + ns(ap_hi, df = 4) +
               ns(ap_lo, df = 4) + gender + cholesterol + gluc + smoke + alco + active, 
             data = train_data, family = binomial(link = "logit"))
@@ -1729,6 +1749,7 @@ summary(fit_step)
 
 pred <- predict(fit_step, type = "response")
 res <- residuals(fit_step, type = "response")
+plot(allEffects(fit_step))
 
 arm::binnedplot(pred, res, nclass = 1000)
 ```
@@ -1739,19 +1760,18 @@ predicted_probs <- predict(fit_step, newdata = test_data, type = "response")
 predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
 actual_labels <- test_data$cardio
 cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
-
 cm_table <- as.data.frame(cm$table)
 cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
-lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
+spline_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
   labs(title = "Confusion Matrix: Logistic Regression with Splines (threshold = 0.4)", x = "Actual", y = "Predicted")
-ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
-lr_confusion_matrix
+ggsave("images/spline_confusion_matrix.png", spline_confusion_matrix, width = 8, height = 8)
+spline_confusion_matrix
 
 roc_curve_splines <- roc(actual_labels, predicted_probs)
 plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
@@ -1814,25 +1834,25 @@ grid_full$alco <- factor(grid_full$alco, levels = levels(train_data$alco))
 grid_full$active <- factor(grid_full$active, levels = levels(train_data$active))
 
 grid_full$predicted_probs <- predict(fit_step, newdata = grid_full, type = "response")
-grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.4, "Yes", "No")
+grid_full$predicted_class <- ifelse(grid_full$predicted_probs >= 0.45, "Yes", "No")
 
 # Add new data for "well above normal" cholesterol
 grid_well_above <- grid_full
 grid_well_above$cholesterol <- "well above normal"
 grid_well_above$predicted_probs <- predict(fit_step, newdata = grid_well_above, type = "response")
-grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.4, "Yes", "No")
+grid_well_above$predicted_class <- ifelse(grid_well_above$predicted_probs >= 0.45, "Yes", "No")
 
 # Add new data for "above normal" cholesterol
 grid_above_normal <- grid_full
 grid_above_normal$cholesterol <- "above normal"
 grid_above_normal$predicted_probs <- predict(fit_step, newdata = grid_above_normal, type = "response")
-grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.4, "Yes", "No")
+grid_above_normal$predicted_class <- ifelse(grid_above_normal$predicted_probs >= 0.45, "Yes", "No")
 
 # Add new data for "normal" cholesterol (this is the default scenario)
 grid_normal <- grid_full
 grid_normal$cholesterol <- "normal"
 grid_normal$predicted_probs <- predict(fit_step, newdata = grid_normal, type = "response")
-grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.4, "Yes", "No")
+grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.45, "Yes", "No")
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
@@ -1840,12 +1860,12 @@ ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
-               color = "black", linewidth = 1, breaks = 0.4) +
+               color = "black", linewidth = 1, breaks = 0.45) +
   geom_contour(data = grid_above_normal, aes(z = predicted_probs, linetype = "Above Normal"), 
-               color = "gray25", linewidth = 1, breaks = 0.4) +
+               color = "gray25", linewidth = 1, breaks = 0.45) +
   geom_contour(data = grid_normal, aes(z = predicted_probs, linetype = "Normal"), 
-               color = "gray95", linewidth = 1, breaks = 0.4) +
-  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels (t=0.4)",
+               color = "gray95", linewidth = 1, breaks = 0.45) +
+  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels (t=0.45)",
        x = "ap_hi", y = "ap_lo", color = "Cardio Outcome", linetype = "Cholesterol Level") +
   scale_linetype_manual(values = c("Normal" = "solid", "Above Normal" = "solid", "Well Above Normal" = "solid")) +
   theme_minimal() +
