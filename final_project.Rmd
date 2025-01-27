@@ -31,25 +31,6 @@ references:
       year: 1995
     publisher: "Elsevier"
     
-  - id: breiman1984classification
-    title: "Classification and Regression Trees"
-    author:
-      - family: "Breiman"
-        given: "L."
-      - family: "Friedman"
-        given: "J."
-      - family: "Olshen"
-        given: "R.A."
-      - family: "Stone"
-        given: "C.J."
-    edition: "1st"
-    publisher: "Chapman and Hall/CRC"
-    issued:
-      year: 1984
-    URL: "https://doi.org/10.1201/9781315139470"
-    DOI: "10.1201/9781315139470"
-
-    
   - id: cardiovascular_disease_dataset
     author:
       - family: "Ulianova"
@@ -61,62 +42,6 @@ references:
       month: 1
       day: 9
     type: dataset
-    
-  - id: bertsimas2017optimal
-    title: "Optimal classification trees"
-    author:
-      - family: "Bertsimas"
-        given: "Dimitris"
-      - family: "Dunn"
-        given: "Jack"
-    container-title: "Machine Learning"
-    volume: 106
-    issue: 7
-    page: "1039-1082"
-    issued:
-      year: 2017
-      month: 7
-      day: 1
-    publisher: "Springer"
-    URL: "https://doi.org/10.1007/s10994-017-5633-9"
-    DOI: "10.1007/s10994-017-5633-9"
-  
-  - id: breiman2001random
-    title: "Random Forests"
-    author:
-      - family: "Breiman"
-        given: "Leo"
-    container-title: "Machine Learning"
-    volume: 45
-    issue: 1
-    page: "5-32"
-    issued:
-      year: 2001
-      month: 10
-      day: 1
-    URL: "https://doi.org/10.1023/A:1010933404324"
-    DOI: "10.1023/A:1010933404324"
-
-  - id: hastie2009elements
-    title: "The Elements of Statistical Learning"
-    author:
-      - family: "Hastie"
-        given: "Trevor"
-      - family: "Tibshirani"
-        given: "Robert"
-      - family: "Friedman"
-        given: "Jerome"
-    edition: "2nd"
-    series-title: "Springer Series in Statistics"
-    publisher: "Springer New York, NY"
-    issued:
-      year: 2009
-      month: 8
-      day: 26
-    ISBN:
-      - "978-0-387-84857-0"
-      - "978-0-387-84858-7"
-    DOI: "https://doi.org/10.1007/978-0-387-84858-7"
     
   - id: malone2010pulse
     title: "Pulse Pressure. Why is it Important?"
@@ -132,7 +57,6 @@ references:
     issued:
       year: 2010
     DOI: "10.3747/pdi.2010.00002"
-
 ---
 
 ```{r setup, include=FALSE}
@@ -1060,6 +984,7 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
 # Convert the confusion matrix into a table
 cm_table <- as.data.frame(cm$table)
+cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
@@ -1068,8 +993,8 @@ rf_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
-  labs(title = "Confusion Matrix: Random Forest", x = "Actual", y = "Predicted")
-ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height = 8)
+  labs(title = "Confusion Matrix: Random Forest (t = 0.50)", x = "Actual", y = "Predicted")
+ggsave("images/rf_confusion_matrix_50.png", rf_confusion_matrix, width = 8, height = 8)
 rf_confusion_matrix
 ```
 
@@ -1103,6 +1028,7 @@ As we could imagine, this enhanced version of classification trees gets a better
 
 If we observe the confusion matrix above, we easily realize that the model tends to underpredict the disease. Given the healthcare context in which we are, a lower threshold for the matrix should also be taken into account.
 
+
 ```{r rf_model_confusion_matrix_OTHER_THRESHOLD}
 ## Confusion Matrix for Random Forest
 predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
@@ -1110,6 +1036,7 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
 # Convert the confusion matrix into a table
 cm_table <- as.data.frame(cm$table)
+cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
@@ -1118,8 +1045,8 @@ rf_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
-  labs(title = "Confusion Matrix: Random Forest (threshold = 0.45)", x = "Actual", y = "Predicted")
-ggsave("images/rf_confusion_matrix.png", rf_confusion_matrix, width = 8, height = 8)
+  labs(title = "Confusion Matrix: Random Forest (t = 0.45)", x = "Actual", y = "Predicted")
+ggsave("images/rf_confusion_matrix_45.png", rf_confusion_matrix, width = 8, height = 8)
 rf_confusion_matrix
 ```
 
@@ -1269,16 +1196,17 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
 # Convert the confusion matrix into a table
 cm_table <- as.data.frame(cm$table)
+cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
-lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Prediction, y = Reference, fill = Count)) +
+lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
-  labs(title = "Confusion Matrix: Logistic Regression", x = "Prediction", y = "Actual")
-ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
+  labs(title = "Confusion Matrix: Logistic Regression (t = 0.50)", x = "Actual", y = "Predicted")
+ggsave("images/lr_confusion_matrix_50.png", lr_confusion_matrix, width = 8, height = 8)
 lr_confusion_matrix
 ```
 
@@ -1311,6 +1239,7 @@ ratio <- metrics_df$Value[7]/metrics_df$Value[6]
 
 The False Positive Rate (FPR) is higher than the False Negative Rate (FPR) by a factor of $1.25$. Considering the medical context, we again try to lower the threshold to see if we can balance the ratio without losing too much in terms of accuracy. 
 
+
 ```{r log_model_confusion_matrix_OTHER_TRESHOLD}
 ## Confusion Matrix for Logistic Regression
 predicted_class <- ifelse(predicted_probs >= 0.45, "Yes", "No")
@@ -1318,6 +1247,7 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
 # Convert the confusion matrix into a table
 cm_table <- as.data.frame(cm$table)
+cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 # Plot the confusion matrix
@@ -1326,8 +1256,8 @@ lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction
   geom_text(aes(label = Count), color = "white") +
   scale_fill_gradient(low = "blue", high = "red") +
   theme_minimal() +
-  labs(title = "Confusion Matrix: Logistic Regression (threshold = 0.45)", x = "Actual", y = "Predicted")
-ggsave("images/lr_confusion_matrix.png", lr_confusion_matrix, width = 8, height = 8)
+  labs(title = "Confusion Matrix: Logistic Regression (t = 0.45)", x = "Actual", y = "Predicted")
+ggsave("images/lr_confusion_matrix_45.png", lr_confusion_matrix, width = 8, height = 8)
 lr_confusion_matrix
 ```
 
@@ -1444,7 +1374,7 @@ Nevertheless, results seem to be similar, if not worse, compared with previous m
 
 #### Residuals
 
-Let's check the residual plots
+Let's check the residual plots:
 ```{r original_residuals 1}
 fit <- glm(cardio ~ ., data = cardio, family = binomial(link = "logit"))
 pred <- predict(fit, type = "response")
@@ -1718,14 +1648,21 @@ fit_step <- stepAIC(fit, direction = "both", trace = FALSE)
 
 summary(fit_step)
 
+pred <- predict(fit_step, type = "response")
+res <- residuals(fit_step, type = "response")
+
+arm::binnedplot(pred, res, nclass = 1000)
+```
+
+
+```{r spline_2}
 predicted_probs <- predict(fit_step, newdata = test_data, type = "response")
-
-predicted_class <- ifelse(predicted_probs >= 0.40, "Yes", "No")
-
+predicted_class <- ifelse(predicted_probs >= 0.4, "Yes", "No")
 actual_labels <- test_data$cardio
 cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 
 cm_table <- as.data.frame(cm$table)
+cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
 
 lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
@@ -1739,9 +1676,8 @@ lr_confusion_matrix
 
 roc_curve_splines <- roc(actual_labels, predicted_probs)
 plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
-auc_spline <- auc(roc_curve_splines)
+auc_spline <- auc(roc_curve)
 print(auc_spline)
-
 png("images/roc_curve_splines.png", width = 800, height = 600)
 plot(roc_curve_splines, main = "ROC Curve", col = "blue", lwd = 2)
 dev.off()
@@ -1765,7 +1701,7 @@ splines_metrics_df <- data.frame(
   Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr, fnr_fpr_ratio)
 )
 
-print(splines_metrics_df)
+print(metrics_df)
 ```
 
 
@@ -1821,16 +1757,16 @@ grid_normal$predicted_class <- ifelse(grid_normal$predicted_probs >= 0.5, "Yes",
 
 ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
   geom_tile(aes(fill = predicted_class), alpha = 0.3) + 
-  geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), size = 2) + 
+  geom_point(data = test_data, aes(x = ap_hi, y = ap_lo, color = factor(cardio)), linewidth = 2) + 
   scale_color_manual(values = c("blue", "red")) +  
   scale_fill_manual(values = c("blue", "red")) +
   geom_contour(data = grid_well_above, aes(z = predicted_probs, linetype = "Well Above Normal"), 
-               color = "black", linewidth = 1, breaks = 0.5) +
+               color = "black", size = 1, breaks = 0.5) +
   geom_contour(data = grid_above_normal, aes(z = predicted_probs, linetype = "Above Normal"), 
-               color = "gray25", linewidth = 1, breaks = 0.5) +
+               color = "gray25", size = 1, breaks = 0.5) +
   geom_contour(data = grid_normal, aes(z = predicted_probs, linetype = "Normal"), 
-               color = "gray95", linewidth = 1, breaks = 0.5) +
-  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels",
+               color = "gray95", size = 1, breaks = 0.5) +
+  labs(title = "Decision Boundary for Logistic Regression Model with Cholesterol Levels (t=0.4)",
        x = "ap_hi", y = "ap_lo", color = "Cardio Outcome", linetype = "Cholesterol Level") +
   scale_linetype_manual(values = c("Normal" = "solid", "Above Normal" = "solid", "Well Above Normal" = "solid")) +
   theme_minimal() +
@@ -1844,7 +1780,6 @@ ggplot(grid_full, aes(x = ap_hi, y = ap_lo, color = predicted_class)) +
         legend.spacing.y = unit(0.5, "mm")) +   # Reduce vertical space between items
   guides(linetype = guide_legend(ncol = 2))  # Split the legend into two columns
 ```
-
 
 
 ## Results
@@ -1904,7 +1839,15 @@ results <- data.frame(
 print(results)
 ```
 
-As it is shown above, the four main models get similar results in the task of classifying the data. Despite its slightly better performance, the lack of explainability makes the random forest a less suitable model for this context, leaving the logistic regressions as the best choices. 
+As it is shown above, the five main models get similar results in the task of classifying the data. Despite its slightly better performance, the lack of explainability makes the splines and the random forest less suitable models for this context, leaving the logistic regressions as the best choices.
+
+Regarding the interpretation of the models, and based on the vanilla logistic regression, we can draw some interesting conclusions:
+
+1. On average, having cholesterol *well above normal* means that the difference in the log-odds of the probability of having a heart disease is $1.059$ compared to having a *normal* level. So the odds ratio amounts to $e^1.059 = 2.88$.
+
+2. In the other hand, being physically active means that the difference in the log-odds of the probability of having a heart disease is $-0.229$ compared to having a *normal* level. So the odds ratio amounts to $e^0.229 = 0.80$, what results in a $20\%$ of probability less of having heart issues.
+
+3. An increasing of the systolic or diastolic pressure can also negatively affect your health. For each augment in $10$ units to them, we get odds ratios of $1.76$ and $1.10$ respectively. 
 
 
 ## References
