@@ -67,7 +67,9 @@ knitr::opts_chunk$set(echo = TRUE)
 ## Introduction
 
 The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [@cardiovascular_disease_dataset].
-
+The data includes different categorical and numerical variables commonly associated to an individual's health status.
+After a brief data exploration, we perform first cluster analysis on the dataset and then fit different types of models (Trees and Random Forest, Logistic regression models and natural splines). All of these deliver a similar performance, but some are more explainable than others. 
+Finally, we discuss some issues with the data, considering its unknown origin and unspecified gathering methods, and hint at how this work could possibly be improved. 
 
 ## Importing libraries
 
@@ -1004,8 +1006,8 @@ rf_confusion_matrix
 ```{r rf_model_other_metrics}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
-FP <- cm$table[1,2]
-FN <- cm$table[2,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
 TP <- cm$table[2,2]
 
 # Calculate metrics
@@ -1056,8 +1058,8 @@ rf_confusion_matrix
 ```{r rf_model_other_metrics_OTHER_THRESHOLD}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
-FP <- cm$table[1,2]
-FN <- cm$table[2,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
 TP <- cm$table[2,2]
 
 # Calculate metrics
@@ -1087,7 +1089,7 @@ With this new value, not only the number of mispredictions was reduced, but also
 
 ### Basic Model
 
-Another interesting approach to the problem could be fitting some logistic regression models. These models are mainly used when the target variable is dichotomous, as in this case, where only two classes can be predicted (0/1).
+We fit some logistic regression models. These models are mainly used when the target variable is dichotomous, as in this case, where only two classes can be predicted. They to map the output of the model into a meaningful range for probabilities([0, 1]).
 
 Let's start building a general model, without interaction between variables. Again, a 5-fold cross-validation will be applied.
 
@@ -1112,7 +1114,7 @@ log_model <- train(
 print(log_model)
 ```
 
-At first sight, the results obtained are pretty similar to the ones from the previous model. 
+At first sight, the results obtained are similar to the ones from the previous model. 
 
 Let's plot the decision boundary with respect `ap_hi` and `ap_lo` to better see the relation between both variables:
 ```{r lr_decision_boundaries}
@@ -1170,7 +1172,6 @@ decision_boundary
 
 Even though some red and green points are misclassified, the great majority are correctly predicted. We can see how both pressures play a significant role in determining the probability of having a cardio disease, providing complementary information for classification.
 
-
 ### Performance
 
 Let's compute some performance metrics:
@@ -1202,7 +1203,7 @@ cm <- confusionMatrix(as.factor(predicted_class), as.factor(actual_labels))
 cm_table <- as.data.frame(cm$table)
 cm_table$Reference <- factor(cm_table$Reference, levels = rev(levels(as.factor(actual_labels))))
 colnames(cm_table) <- c("Prediction", "Reference", "Count")
-
+cm
 # Plot the confusion matrix
 lr_confusion_matrix <- ggplot(data = cm_table, aes(x = Reference, y = Prediction, fill = Count)) +
   geom_tile() +
@@ -1217,8 +1218,8 @@ lr_confusion_matrix
 ```{r lg_model_other_metrics}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
-FP <- cm$table[1,2]
-FN <- cm$table[2,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
 TP <- cm$table[2,2]
 
 # Calculate metrics
@@ -1268,8 +1269,8 @@ lr_confusion_matrix
 ```{r lg_model_other_metrics_OTHER_TRESHOLD}
 ## Performance Metrics Calculation
 TN <- cm$table[1,1]
-FP <- cm$table[1,2]
-FN <- cm$table[2,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
 TP <- cm$table[2,2]
 
 # Calculate metrics
@@ -1290,6 +1291,7 @@ lr_metrics_df <- data.frame(
 # Print computed metrics
 print(lr_metrics_df)
 ```
+Considering that in a medical context it is often preferred to overpredict than to underpredict values, this lower threshold is preferred: while the false positive rate is increased, we are overall able to correctly classify more patients.
 
 Understanding the contribution of each feature to the model could also help us explain the model in more depth:
 ```{r lr-feature-importance}
@@ -1552,13 +1554,32 @@ actual_labels <- as.factor(Y_test)
 levels(actual_labels) <- c("No", "Yes")
 
 # Create confusion matrix
-conf_matrix <- confusionMatrix(
+cm <- confusionMatrix(
   factor(predicted_class),
   factor(actual_labels),
   positive = "Yes"
 )
-lasso_sensitivity <- conf_matrix$byClass["Sensitivity"]
-lasso_specificity <- conf_matrix$byClass["Specificity"]
+
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+lasso_metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
 
 # Manually compute the area under ROC curve
 roc_curve_lasso <- roc(actual_labels, as.numeric(predictions))
@@ -1599,13 +1620,32 @@ roc_curve_poly3 <- roc(actual_labels, predicted_probs)
 auc_poly3 <- auc(roc_curve_poly3)
 
 # Create confusion matrix
-conf_matrix <- confusionMatrix(
+cm <- confusionMatrix(
   factor(predicted_class),
   factor(actual_labels),
   positive = "Yes"
 )
-poly3_sensitivity <- conf_matrix$byClass["Sensitivity"]
-poly3_specificity <- conf_matrix$byClass["Specificity"]
+
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+poly3_metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
 
 # ROC curve
 plot(roc_curve_poly3, main = "ROC Curve for poly3", col = "blue", lwd = 2)
@@ -1641,14 +1681,32 @@ roc_curve_poly4 <- roc(actual_labels, predicted_probs)
 auc_poly4 <- auc(roc_curve_poly4)
 
 # Create confusion matrix
-conf_matrix <- confusionMatrix(
+cf <- confusionMatrix(
   factor(predicted_class),
   factor(actual_labels),
   positive = "Yes"
 )
-poly4_sensitivity <- conf_matrix$byClass["Sensitivity"]
-poly4_specificity <- conf_matrix$byClass["Specificity"]
 
+## Performance Metrics Calculation
+TN <- cm$table[1,1]
+FP <- cm$table[2,1]
+FN <- cm$table[1,2]
+TP <- cm$table[2,2]
+
+# Calculate metrics
+accuracy <- (TP + TN) / (TP + TN + FP + FN)
+precision <- TP / (TP + FP)
+recall <- TP / (TP + FN)  # Sensitivity
+specificity <- TN / (TN + FP)
+f1_score <- 2 * ((precision * recall) / (precision + recall))
+fpr <- FP / (FP + TN)
+fnr <- FN / (FN + TP)
+
+# Create a dataframe for visualization
+poly4_metrics_df <- data.frame(
+  Metric = c("Accuracy", "Precision", "Recall (Sensitivity)", "Specificity", "F1-Score", "FPR", "FNR"),
+  Value = c(accuracy, precision, recall, specificity, f1_score, fpr, fnr)
+)
 # ROC curve
 plot(roc_curve_poly4, main = "ROC Curve for poly4", col = "blue", lwd = 2)
 ```
@@ -1844,17 +1902,17 @@ results <- data.frame(
   Sensitivity = c(
     rf_metrics_df$Value[rf_metrics_df$Metric == "Recall (Sensitivity)"],
     lr_metrics_df$Value[lr_metrics_df$Metric == "Recall (Sensitivity)"],
-    lasso_sensitivity,
-    poly3_sensitivity,
-    poly4_sensitivity,
+    lasso_metrics_df$Value[lasso_metrics_df$Metric == "Recall (Sensitivity)"],
+    poly3_metrics_df$Value[poly3_metrics_df$Metric == "Recall (Sensitivity)"],
+    poly4_metrics_df$Value[poly4_metrics_df$Metric == "Recall (Sensitivity)"],
     splines_metrics_df$Value[splines_metrics_df$Metric == "Recall (Sensitivity)"]
   ),
   Specificity = c(
     rf_metrics_df$Value[rf_metrics_df$Metric == "Specificity"],
     lr_metrics_df$Value[lr_metrics_df$Metric == "Specificity"],
-    lasso_specificity,
-    poly3_specificity,
-    poly4_specificity,
+    lasso_metrics_df$Value[lasso_metrics_df$Metric == "Specificity"],
+    poly3_metrics_df$Value[poly3_metrics_df$Metric == "Specificity"],
+    poly4_metrics_df$Value[poly4_metrics_df$Metric == "Specificity"],
     splines_metrics_df$Value[splines_metrics_df$Metric == "Specificity"]
   )
 )
