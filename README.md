@@ -1,23 +1,23 @@
-# Cardiovascular Disease Data Analysis
+# Cardiovascular Disease Data Analysis and Prediction
+
+The analysis is centered around the prediction of presence of cardiovascular disease, given data about patients [^1]. The data includes different categorical and numerical variables commonly associated to an individual’s health status. After a brief data exploration, we perform first cluster analysis on the dataset and then fit different types of models: Trees and Random Forest, Logistic Regression and Natural Splines. Finally, we discuss some issues with the data, considering its unknown origin and unspecified gathering methods, and hint at how this work could possibly be improved.
+
+More specifically, the following steps are performed:
+
+- Data exploration
+  - Preprocessing
+  - Distribution analysis
+  - Correlation analysis
+- K-Means Clustering
+- Trees & Random Forest
+- Logistic Regression
+  - Base Model
+  - Models with interection between variables
+  - Polynomial Regressions
+  - LASSO Regression
+ - Natural Splines
+ - Results overview
+  
 
 
-### Example Project
-https://www.kaggle.com/code/janiobachmann/patient-charges-clustering-and-regression
-
-### Our Project
-https://www.kaggle.com/datasets/sulianova/cardiovascular-disease-dataset
-
-## Outline & Tasks
-- Exploratory data Analysis
-- Identification of most interesting variables and relationships
-- (possible) feature engineering:
-    - log transformations
-    - scaling
-- Brief description of the models that will be used.
-- Fit of models and variables selection.
-- Model comparison:
-    -AIC, BIC
-    - residual Analysis
-- Use the best model to actually draw some (possibly) interesting conclusions e.g:
-    - which factors contribute the most, by how much...
-    - (if applicable) how significant they are. 
+[^1]: https://www.kaggle.com/datasets/sulianova/cardiovascular-disease-dataset
